@@ -12,6 +12,7 @@ import LibraryExportPanel from './components/panel/right/LibraryExportPanel';
 import Resizer from './components/ui/Resizer';
 import GlobalTooltip from './components/ui/GlobalTooltip';
 import AppModals from './components/modals/AppModals';
+import DomTranslator from './i18n/DomTranslator';
 
 import EditorView from './components/views/EditorView';
 import LibraryView from './components/views/LibraryView';
@@ -786,6 +787,7 @@ const AppWrapper = () => (
   <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} routerPush={(to) => {}} routerReplace={(to) => {}}>
     <ContextMenuProvider>
       <App />
+      <DomTranslator />
       <GlobalTooltip />
     </ContextMenuProvider>
   </ClerkProvider>

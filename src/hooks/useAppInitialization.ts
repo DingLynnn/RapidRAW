@@ -7,6 +7,7 @@ import { useLibraryStore } from '../store/useLibraryStore';
 import { useEditorStore } from '../store/useEditorStore';
 import { THEMES, DEFAULT_THEME_ID, ThemeProps } from '../utils/themes';
 import { COPYABLE_ADJUSTMENT_KEYS } from '../utils/adjustments';
+import { DEFAULT_LANGUAGE } from '../i18n/translations';
 import {
   FilterCriteria,
   Invokes,
@@ -199,6 +200,7 @@ export const useAppInitialization = ({
         console.error('Failed to load settings:', err);
         setAppSettings({
           lastRootPath: null,
+          language: DEFAULT_LANGUAGE,
           theme: DEFAULT_THEME_ID as Theme,
           thumbnailSize: defaultThumbnailSize,
           libraryViewMode: defaultLibraryViewMode,

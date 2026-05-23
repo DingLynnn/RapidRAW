@@ -253,6 +253,10 @@ pub fn default_linear_raw_mode() -> String {
     "auto".to_string()
 }
 
+pub fn default_language() -> String {
+    "zh-CN".to_string()
+}
+
 pub fn default_tagging_shortcuts_option() -> Option<Vec<String>> {
     Some(vec![
         "portrait".to_string(),
@@ -379,6 +383,8 @@ pub struct AppSettings {
     pub enable_focus_mode: Option<bool>,
     #[serde(default)]
     pub folder_icons: Option<HashMap<String, String>>,
+    #[serde(default = "default_language")]
+    pub language: String,
 }
 
 impl Default for AppSettings {
@@ -458,6 +464,7 @@ impl Default for AppSettings {
             default_non_raw_tonemapper: Some("basic".to_string()),
             enable_focus_mode: Some(false),
             folder_icons: Some(HashMap::new()),
+            language: default_language(),
         }
     }
 }

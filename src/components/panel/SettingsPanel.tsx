@@ -44,6 +44,8 @@ import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { useOsPlatform } from '../../hooks/useOsPlatform';
 import { open } from '@tauri-apps/plugin-shell';
+import { LANGUAGE_OPTIONS } from '../../i18n/translations';
+import type { Language } from '../../i18n/translations';
 
 interface ConfirmModalState {
   confirmText: string;
@@ -990,6 +992,15 @@ export default function SettingsPanel({
                         onChange={(value: any) => onSettingsChange({ ...appSettings, theme: value })}
                         options={THEMES.map((theme: ThemeProps) => ({ value: theme.id, label: theme.name }))}
                         value={appSettings?.theme || DEFAULT_THEME_ID}
+                        triggerClassName="bg-bg-primary"
+                      />
+                    </SettingItem>
+
+                    <SettingItem label="Language" description="Change the application language.">
+                      <Dropdown
+                        onChange={(value: Language) => onSettingsChange({ ...appSettings, language: value })}
+                        options={LANGUAGE_OPTIONS}
+                        value={appSettings?.language || 'zh-CN'}
                         triggerClassName="bg-bg-primary"
                       />
                     </SettingItem>

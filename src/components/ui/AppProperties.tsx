@@ -1,6 +1,7 @@
 import { ExportPreset } from './ExportImportProperties';
 import { Adjustments, CopyPasteSettings } from '../../utils/adjustments';
 import { ToolType } from '../panel/right/Masks';
+import type { Language } from '../../i18n/translations';
 
 export const GLOBAL_KEYS = [
   ' ',
@@ -188,6 +189,7 @@ export interface AppSettings {
   canvasInputMode?: 'mouse' | 'trackpad';
   zoomSpeedMultiplier?: number;
   keybinds?: { [action: string]: string[] };
+  language?: Language;
   tonemapperOverrideEnabled?: boolean;
   defaultRawTonemapper?: string;
   defaultNonRawTonemapper?: string;
