@@ -36,6 +36,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ConfigurePresetModal from '../../modals/ConfigurePresetModal';
 import CreateFolderModal from '../../modals/CreateFolderModal';
 import RenameFolderModal from '../../modals/RenameFolderModal';
+import SmartToneSuggestions from './SmartToneSuggestions';
 import Button from '../../ui/Button';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
@@ -985,6 +986,13 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
           onContextMenu={handleBackgroundContextMenu}
           ref={setRootNodeRef}
         >
+          <SmartToneSuggestions
+            key={selectedImage?.path || 'smart-tone-empty'}
+            adjustments={adjustments}
+            selectedImage={selectedImage}
+            setAdjustments={setAdjustments}
+          />
+
           {isLoading && presets.length === 0 && (
             <Text
               as="div"

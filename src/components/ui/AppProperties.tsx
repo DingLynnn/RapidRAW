@@ -38,6 +38,7 @@ export enum Invokes {
   ApplyDenoising = 'apply_denoising',
   BatchExportImages = 'batch_export_images',
   CalculateAutoAdjustments = 'calculate_auto_adjustments',
+  CalculateSmartToneSuggestions = 'calculate_smart_tone_suggestions',
   CancelExport = 'cancel_export',
   CheckAIConnectorStatus = 'check_ai_connector_status',
   ClearAllSidecars = 'clear_all_sidecars',

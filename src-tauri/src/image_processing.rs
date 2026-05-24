@@ -3133,6 +3133,371 @@ pub fn auto_results_to_json(results: &AutoAdjustmentResults) -> serde_json::Valu
     })
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SmartToneSuggestion {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub confidence: f64,
+    pub tags: Vec<String>,
+    pub adjustments: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SmartToneStats {
+    p50: usize,
+    range: f64,
+    mean_saturation: f64,
+    shadow_percent: f64,
+    highlight_percent: f64,
+    clipped_percent: f64,
+    temperature_correction: f64,
+    tint_correction: f64,
+}
+
+fn analyze_smart_tone_stats(image: &DynamicImage) -> SmartToneStats {
+    const ANALYSIS_MAX_DIM: u32 = 768;
+    const LUMA_R: f64 = 0.2126;
+    const LUMA_G: f64 = 0.7152;
+    const LUMA_B: f64 = 0.0722;
+
+    let analysis_preview = downscale_f32_image(image, ANALYSIS_MAX_DIM, ANALYSIS_MAX_DIM);
+    let rgb_image = analysis_preview.to_rgb8();
+    let total_pixels = (rgb_image.width() * rgb_image.height()).max(1) as f64;
+
+    let mut luma_hist = vec![0u32; 256];
+    let mut mean_saturation = 0.0f64;
+    let mut neutral_r = 0.0f64;
+    let mut neutral_g = 0.0f64;
+    let mut neutral_b = 0.0f64;
+    let mut neutral_count = 0.0f64;
+
+    for pixel in rgb_image.pixels() {
+        let r = pixel[0] as f64;
+        let g = pixel[1] as f64;
+        let b = pixel[2] as f64;
+        let luma = LUMA_R * r + LUMA_G * g + LUMA_B * b;
+        luma_hist[(luma.round() as usize).min(255)] += 1;
+
+        let max_c = r.max(g).max(b);
+        let min_c = r.min(g).min(b);
+        let saturation = if max_c > 0.0 { (max_c - min_c) / max_c } else { 0.0 };
+        mean_saturation += saturation;
+
+        if (40.0..225.0).contains(&luma) && saturation < 0.35 {
+            neutral_r += r;
+            neutral_g += g;
+            neutral_b += b;
+            neutral_count += 1.0;
+        }
+    }
+
+    let percentile = |hist: &Vec<u32>, p: f64| -> usize {
+        let target = (total_pixels * p) as u32;
+        let mut cumulative = 0u32;
+        for (i, &v) in hist.iter().enumerate() {
+            cumulative += v;
+            if cumulative >= target {
+                return i;
+            }
+        }
+        255
+    };
+
+    let p1 = percentile(&luma_hist, 0.01);
+    let p50 = percentile(&luma_hist, 0.50);
+    let p99 = percentile(&luma_hist, 0.99);
+    let shadow_percent = luma_hist[0..32].iter().sum::<u32>() as f64 / total_pixels;
+    let highlight_percent = luma_hist[240..256].iter().sum::<u32>() as f64 / total_pixels;
+    let clipped_percent = luma_hist[250..256].iter().sum::<u32>() as f64 / total_pixels;
+
+    let (temperature_correction, tint_correction) = if neutral_count > total_pixels * 0.01 {
+        let avg_r = neutral_r / neutral_count;
+        let avg_g = neutral_g / neutral_count;
+        let avg_b = neutral_b / neutral_count;
+        let temp = ((avg_b - avg_r) / 255.0 * 90.0).clamp(-35.0, 35.0);
+        let tint = ((avg_g - ((avg_r + avg_b) * 0.5)) / 255.0 * 90.0).clamp(-30.0, 30.0);
+        (temp, tint)
+    } else {
+        (0.0, 0.0)
+    };
+
+    SmartToneStats {
+        p50,
+        range: (p99 as f64 - p1 as f64).max(1.0),
+        mean_saturation: mean_saturation / total_pixels,
+        shadow_percent,
+        highlight_percent,
+        clipped_percent,
+        temperature_correction,
+        tint_correction,
+    }
+}
+
+fn point_curve(shadows: f64, midtones: f64, highlights: f64) -> serde_json::Value {
+    json!({
+        "luma": [
+            { "x": 0, "y": 0 },
+            { "x": 64, "y": (64.0 + shadows).clamp(0.0, 255.0) },
+            { "x": 128, "y": (128.0 + midtones).clamp(0.0, 255.0) },
+            { "x": 192, "y": (192.0 + highlights).clamp(0.0, 255.0) },
+            { "x": 255, "y": 255 }
+        ],
+        "red": [{ "x": 0, "y": 0 }, { "x": 255, "y": 255 }],
+        "green": [{ "x": 0, "y": 0 }, { "x": 255, "y": 255 }],
+        "blue": [{ "x": 0, "y": 0 }, { "x": 255, "y": 255 }]
+    })
+}
+
+fn smart_adjustments(
+    auto: &AutoAdjustmentResults,
+    stats: SmartToneStats,
+    contrast_delta: f64,
+    vibrance_delta: f64,
+    saturation: f64,
+    warmth_delta: f64,
+    clarity_delta: f64,
+    dehaze_delta: f64,
+    curve: serde_json::Value,
+    color_grading: serde_json::Value,
+    hsl: serde_json::Value,
+    effects: serde_json::Value,
+) -> serde_json::Value {
+    json!({
+        "exposure": auto.exposure,
+        "brightness": auto.brightness,
+        "contrast": (auto.contrast + contrast_delta).clamp(-100.0, 100.0),
+        "highlights": auto.highlights.clamp(-100.0, 100.0),
+        "shadows": auto.shadows.clamp(-100.0, 100.0),
+        "whites": auto.whites.clamp(-100.0, 100.0),
+        "blacks": auto.blacks.clamp(-100.0, 100.0),
+        "temperature": (stats.temperature_correction + warmth_delta).clamp(-100.0, 100.0),
+        "tint": stats.tint_correction.clamp(-100.0, 100.0),
+        "vibrance": (auto.vibrancy + vibrance_delta).clamp(-100.0, 100.0),
+        "saturation": saturation.clamp(-100.0, 100.0),
+        "clarity": (auto.clarity + clarity_delta).clamp(-100.0, 100.0),
+        "dehaze": (auto.dehaze + dehaze_delta).clamp(-100.0, 100.0),
+        "centré": auto.centre.clamp(-100.0, 100.0),
+        "curveMode": "point",
+        "curves": curve.clone(),
+        "pointCurves": curve,
+        "colorGrading": color_grading,
+        "hsl": hsl,
+        "vignetteAmount": effects.get("vignetteAmount").and_then(|v| v.as_f64()).unwrap_or(auto.vignette_amount).clamp(-100.0, 100.0),
+        "vignetteFeather": effects.get("vignetteFeather").and_then(|v| v.as_f64()).unwrap_or(50.0),
+        "vignetteMidpoint": effects.get("vignetteMidpoint").and_then(|v| v.as_f64()).unwrap_or(50.0),
+        "vignetteRoundness": effects.get("vignetteRoundness").and_then(|v| v.as_f64()).unwrap_or(0.0),
+        "grainAmount": effects.get("grainAmount").and_then(|v| v.as_f64()).unwrap_or(0.0),
+        "grainSize": effects.get("grainSize").and_then(|v| v.as_f64()).unwrap_or(25.0),
+        "grainRoughness": effects.get("grainRoughness").and_then(|v| v.as_f64()).unwrap_or(50.0),
+        "toneMapper": "agx",
+        "sectionVisibility": {
+            "basic": true,
+            "curves": true,
+            "color": true,
+            "details": true,
+            "effects": true
+        }
+    })
+}
+
+fn default_color_grading() -> serde_json::Value {
+    json!({
+        "balance": 0,
+        "blending": 50,
+        "global": { "hue": 0, "saturation": 0, "luminance": 0 },
+        "highlights": { "hue": 0, "saturation": 0, "luminance": 0 },
+        "midtones": { "hue": 0, "saturation": 0, "luminance": 0 },
+        "shadows": { "hue": 0, "saturation": 0, "luminance": 0 }
+    })
+}
+
+fn default_hsl() -> serde_json::Value {
+    json!({
+        "aquas": { "hue": 0, "saturation": 0, "luminance": 0 },
+        "blues": { "hue": 0, "saturation": 0, "luminance": 0 },
+        "greens": { "hue": 0, "saturation": 0, "luminance": 0 },
+        "magentas": { "hue": 0, "saturation": 0, "luminance": 0 },
+        "oranges": { "hue": 0, "saturation": 0, "luminance": 0 },
+        "purples": { "hue": 0, "saturation": 0, "luminance": 0 },
+        "reds": { "hue": 0, "saturation": 0, "luminance": 0 },
+        "yellows": { "hue": 0, "saturation": 0, "luminance": 0 }
+    })
+}
+
+fn smart_tone_tags(stats: SmartToneStats) -> Vec<String> {
+    let mut tags = Vec::new();
+    if stats.range < 150.0 {
+        tags.push("低对比".to_string());
+    }
+    if stats.p50 < 95 {
+        tags.push("中间调偏暗".to_string());
+    } else if stats.p50 > 165 {
+        tags.push("中间调偏亮".to_string());
+    }
+    if stats.shadow_percent > 0.06 {
+        tags.push("暗部较重".to_string());
+    }
+    if stats.highlight_percent > 0.02 {
+        tags.push("保护高光".to_string());
+    }
+    if stats.clipped_percent > 0.004 {
+        tags.push("防止溢出".to_string());
+    }
+    if stats.mean_saturation < 0.16 {
+        tags.push("色彩偏淡".to_string());
+    } else if stats.mean_saturation > 0.38 {
+        tags.push("色彩较强".to_string());
+    }
+    if stats.temperature_correction.abs() > 6.0 || stats.tint_correction.abs() > 5.0 {
+        tags.push("校正白平衡".to_string());
+    }
+    if tags.is_empty() {
+        tags.push("画面均衡".to_string());
+    }
+    tags
+}
+
+pub fn generate_smart_tone_suggestions(image: &DynamicImage) -> Vec<SmartToneSuggestion> {
+    let auto = perform_auto_analysis(image);
+    let stats = analyze_smart_tone_stats(image);
+    let base_tags = smart_tone_tags(stats);
+    let confidence = (0.92 - stats.clipped_percent * 10.0 + ((220.0 - stats.range).max(0.0) / 220.0) * 0.04)
+        .clamp(0.72, 0.97);
+
+    let clean = SmartToneSuggestion {
+        id: "ai-balanced".to_string(),
+        name: "AI 平衡".to_string(),
+        description: "中性曝光、校正白平衡，并使用克制的基础曲线。".to_string(),
+        confidence,
+        tags: base_tags.clone(),
+        adjustments: smart_adjustments(
+            &auto,
+            stats,
+            0.0,
+            if stats.mean_saturation < 0.2 { 10.0 } else { 4.0 },
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            point_curve(-4.0, 3.0, 4.0),
+            default_color_grading(),
+            default_hsl(),
+            json!({ "vignetteAmount": auto.vignette_amount, "vignetteFeather": 55, "vignetteMidpoint": 48 }),
+        ),
+    };
+
+    let filmic = SmartToneSuggestion {
+        id: "ai-filmic-warm".to_string(),
+        name: "胶片暖调".to_string(),
+        description: "暖高光、冷暗部、柔和对比，并加入轻微颗粒。".to_string(),
+        confidence: (confidence - 0.04).clamp(0.68, 0.95),
+        tags: vec!["LUT 风格".to_string(), "暖高光".to_string(), "柔和过渡".to_string()],
+        adjustments: smart_adjustments(
+            &auto,
+            stats,
+            7.0,
+            8.0,
+            -3.0,
+            7.0,
+            -2.0,
+            0.0,
+            point_curve(-8.0, 4.0, -3.0),
+            json!({
+                "balance": 8,
+                "blending": 62,
+                "global": { "hue": 0, "saturation": 0, "luminance": 0 },
+                "highlights": { "hue": 42, "saturation": 9, "luminance": 2 },
+                "midtones": { "hue": 32, "saturation": 4, "luminance": 1 },
+                "shadows": { "hue": 220, "saturation": 8, "luminance": -2 }
+            }),
+            json!({
+                "aquas": { "hue": 0, "saturation": -4, "luminance": 0 },
+                "blues": { "hue": -3, "saturation": -8, "luminance": -2 },
+                "greens": { "hue": -6, "saturation": -8, "luminance": 3 },
+                "magentas": { "hue": 0, "saturation": 0, "luminance": 0 },
+                "oranges": { "hue": -2, "saturation": 4, "luminance": 2 },
+                "purples": { "hue": 0, "saturation": -4, "luminance": 0 },
+                "reds": { "hue": 0, "saturation": 2, "luminance": 1 },
+                "yellows": { "hue": -4, "saturation": -6, "luminance": 2 }
+            }),
+            json!({ "vignetteAmount": (auto.vignette_amount - 8.0).clamp(-100.0, 100.0), "vignetteFeather": 65, "vignetteMidpoint": 46, "grainAmount": 7, "grainSize": 22, "grainRoughness": 54 }),
+        ),
+    };
+
+    let vivid = SmartToneSuggestion {
+        id: "ai-vivid-detail".to_string(),
+        name: "鲜明细节".to_string(),
+        description: "增强局部对比、色彩分离和去雾力度。".to_string(),
+        confidence: (confidence - 0.02).clamp(0.7, 0.96),
+        tags: vec!["色彩鲜明".to_string(), "细节清晰".to_string(), "适合风光".to_string()],
+        adjustments: smart_adjustments(
+            &auto,
+            stats,
+            15.0,
+            if stats.mean_saturation < 0.22 { 22.0 } else { 12.0 },
+            4.0,
+            1.0,
+            10.0,
+            8.0,
+            point_curve(-10.0, 2.0, 10.0),
+            default_color_grading(),
+            json!({
+                "aquas": { "hue": -4, "saturation": 8, "luminance": 2 },
+                "blues": { "hue": -4, "saturation": 10, "luminance": -4 },
+                "greens": { "hue": -5, "saturation": 8, "luminance": 4 },
+                "magentas": { "hue": 0, "saturation": 0, "luminance": 0 },
+                "oranges": { "hue": 0, "saturation": 4, "luminance": 1 },
+                "purples": { "hue": 0, "saturation": 0, "luminance": 0 },
+                "reds": { "hue": 0, "saturation": 3, "luminance": 0 },
+                "yellows": { "hue": -3, "saturation": 4, "luminance": 2 }
+            }),
+            json!({ "vignetteAmount": (auto.vignette_amount - 4.0).clamp(-100.0, 100.0), "vignetteFeather": 58, "vignetteMidpoint": 50 }),
+        ),
+    };
+
+    let soft = SmartToneSuggestion {
+        id: "ai-soft-natural".to_string(),
+        name: "柔和自然".to_string(),
+        description: "柔和提亮暗部、降低饱和度，并平滑高光对比。".to_string(),
+        confidence: (confidence - 0.03).clamp(0.69, 0.95),
+        tags: vec!["自然肤色".to_string(), "柔和对比".to_string(), "温和色彩".to_string()],
+        adjustments: smart_adjustments(
+            &auto,
+            stats,
+            -5.0,
+            4.0,
+            -6.0,
+            3.0,
+            -6.0,
+            -2.0,
+            point_curve(6.0, 4.0, -6.0),
+            json!({
+                "balance": 4,
+                "blending": 58,
+                "global": { "hue": 0, "saturation": 0, "luminance": 0 },
+                "highlights": { "hue": 38, "saturation": 4, "luminance": 2 },
+                "midtones": { "hue": 28, "saturation": 2, "luminance": 1 },
+                "shadows": { "hue": 225, "saturation": 3, "luminance": 1 }
+            }),
+            json!({
+                "aquas": { "hue": 0, "saturation": -6, "luminance": 0 },
+                "blues": { "hue": 0, "saturation": -8, "luminance": 2 },
+                "greens": { "hue": -4, "saturation": -10, "luminance": 4 },
+                "magentas": { "hue": 0, "saturation": -4, "luminance": 0 },
+                "oranges": { "hue": -1, "saturation": 2, "luminance": 3 },
+                "purples": { "hue": 0, "saturation": -6, "luminance": 0 },
+                "reds": { "hue": 0, "saturation": -2, "luminance": 2 },
+                "yellows": { "hue": -5, "saturation": -8, "luminance": 4 }
+            }),
+            json!({ "vignetteAmount": (auto.vignette_amount - 2.0).clamp(-100.0, 100.0), "vignetteFeather": 70, "vignetteMidpoint": 55 }),
+        ),
+    };
+
+    vec![clean, filmic, vivid, soft]
+}
+
 #[tauri::command]
 pub fn calculate_auto_adjustments(
     state: tauri::State<AppState>,
@@ -3149,4 +3514,20 @@ pub fn calculate_auto_adjustments(
     let results = perform_auto_analysis(&original_image);
 
     Ok(auto_results_to_json(&results))
+}
+
+#[tauri::command]
+pub fn calculate_smart_tone_suggestions(
+    state: tauri::State<AppState>,
+) -> Result<Vec<SmartToneSuggestion>, String> {
+    let original_image = state
+        .original_image
+        .lock()
+        .unwrap()
+        .as_ref()
+        .ok_or("No image loaded for smart tone suggestions")?
+        .image
+        .clone();
+
+    Ok(generate_smart_tone_suggestions(&original_image))
 }
