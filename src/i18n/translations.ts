@@ -166,8 +166,8 @@ export const zhCN: Record<string, string> = {
   'Change the application font.': '更改应用字体。',
   'System Default': '系统默认',
   'Native Titlebar': '原生标题栏',
-  "Use your system's default window titlebar instead of RapidRAW's custom one.":
-    '使用系统默认窗口标题栏，而不是 RapidRAW 自定义标题栏。',
+  "Use your system's default window titlebar instead of MonoRin's custom one.":
+    '使用系统默认窗口标题栏，而不是 MonoRin 自定义标题栏。',
   'Enable OS Titlebar': '启用系统标题栏',
   'Adjustments Visibility': '调整项可见性',
   "Hide adjustment sections you don't use often to simplify the editing panel. Your settings will be preserved and applied even when hidden.":
@@ -197,8 +197,8 @@ export const zhCN: Record<string, string> = {
   'The maximum number of tags to generate per image.': '每张图片生成的最大标签数。',
   Amount: '数量',
   'Custom AI Tag List': '自定义 AI 标签列表',
-  'If provided, the AI will ONLY use tags from this list, overriding RapidRAW’s built-in list. Tagging works only in English.':
-    '设置后，AI 只会使用此列表中的标签，并覆盖 RapidRAW 内置列表。标签识别仅支持英文。',
+  'If provided, the AI will ONLY use tags from this list, overriding MonoRin’s built-in list. Tagging works only in English.':
+    '设置后，AI 只会使用此列表中的标签，并覆盖 MonoRin 内置列表。标签识别仅支持英文。',
   'No custom AI tags (Using built-in list)': '没有自定义 AI 标签（使用内置列表）',
   'Add custom AI tags (comma separated)...': '添加自定义 AI 标签（用逗号分隔）...',
   'Add AI tag': '添加 AI 标签',
@@ -485,17 +485,17 @@ export const zhCN: Record<string, string> = {
     '处理引擎相关更改需要重启应用后生效。',
   'Save & Relaunch': '保存并重启',
   'Generative AI': '生成式 AI',
-  "RapidRAW's AI is built for flexibility. Choose your ideal workflow, from fast local tools to powerful self-hosting.":
-    'RapidRAW 的 AI 设计强调灵活性。你可以选择快速本地工具，也可以连接强大的自托管工作流。',
+  "MonoRin's AI is built for flexibility. Choose your ideal workflow, from fast local tools to powerful self-hosting.":
+    'MonoRin 的 AI 设计强调灵活性。你可以选择快速本地工具，也可以连接强大的自托管工作流。',
   'Built-in AI (CPU)': '内置 AI（CPU）',
-  'Integrated directly into RapidRAW, these features run entirely on your computer. They are fast, free, and require no setup, making them ideal for everyday workflow acceleration.':
-    '这些功能直接集成在 RapidRAW 中，完全在本机运行。速度快、免费且无需配置，适合日常工作流提速。',
+  'Integrated directly into MonoRin, these features run entirely on your computer. They are fast, free, and require no setup, making them ideal for everyday workflow acceleration.':
+    '这些功能直接集成在 MonoRin 中，完全在本机运行。速度快、免费且无需配置，适合日常工作流提速。',
   'AI Masking (Subject, Sky, Foreground)': 'AI 蒙版（主体、天空、前景）',
   'Automatic Image Tagging': '自动图像标签',
   'Simple CPU-based Generative Replace': '基于 CPU 的简单生成式替换',
-  'Self-Hosted (RapidRAW AI Connector)': '自托管（RapidRAW AI 连接器）',
-  'For users with a capable GPU who want maximum control, connect RapidRAW to your own Connector server. This gives you full control for technical workflows.':
-    '如果你有性能足够的 GPU 并希望完全掌控流程，可以将 RapidRAW 连接到自己的 Connector 服务器，以获得完整技术工作流控制。',
+  'Self-Hosted (MonoRin AI Connector)': '自托管（MonoRin AI 连接器）',
+  'For users with a capable GPU who want maximum control, connect MonoRin to your own Connector server. This gives you full control for technical workflows.':
+    '如果你有性能足够的 GPU 并希望完全掌控流程，可以将 MonoRin 连接到自己的 Connector 服务器，以获得完整技术工作流控制。',
   'Use your own ComfyUI instance': '使用你自己的 ComfyUI 实例',
   'Cost-free advanced generative edits': '零额外成本的高级生成式编辑',
   'Custom workflow selection': '自定义工作流选择',
@@ -717,7 +717,7 @@ export const zhCN: Record<string, string> = {
   'Delete Preset': '删除预设',
   'Preset File': '预设文件',
   'All Preset Files': '所有预设文件',
-  'RapidRAW Preset': 'RapidRAW 预设',
+  'MonoRin Preset': 'MonoRin 预设',
   'Legacy Preset': '旧版预设',
   'Enter preset name...': '输入预设名称...',
   'Include Masks': '包含蒙版',
@@ -1099,8 +1099,8 @@ export const zhCN: Record<string, string> = {
   'NIND (AI - Best for RAW)': 'NIND（AI - 最适合 RAW）',
   'Using basic local CPU. Select Cloud or AI Connector in settings for generative replace.':
     '正在使用本地基础 CPU。若要使用生成式替换，请在设置中选择云端或 AI 连接器。',
-  'A huge thank you to the following projects that were very important in the development of RapidRAW:':
-    '特别感谢以下项目，它们对 RapidRAW 的开发非常重要：',
+  'A huge thank you to the following projects that were very important in the development of MonoRin:':
+    '特别感谢以下项目，它们对 MonoRin 的开发非常重要：',
   ': For the excellent Rust crate that provides the foundation for RAW file processing in this project.':
     '：感谢其出色的 Rust crate，为本项目的 RAW 文件处理提供基础。',
   ': For its invaluable open-source library and comprehensive database for automatic lens correction.':
@@ -1114,12 +1114,12 @@ export const zhCN: Record<string, string> = {
     '：感谢其提供用于 AI 天空和前景检测能力的稳健架构。',
   ': For the powerful monocular depth estimation model that enables the AI depth masking capabilities.':
     '：感谢其强大的单目深度估计模型，让 AI 深度蒙版成为可能。',
-  ': For providing AI models that power the AI noise reduction capabilities in RapidRAW.':
-    '：感谢其提供 AI 模型，为 RapidRAW 的 AI 降噪能力提供支持。',
+  ': For providing AI models that power the AI noise reduction capabilities in MonoRin.':
+    '：感谢其提供 AI 模型，为 MonoRin 的 AI 降噪能力提供支持。',
   ': For some reference implementations that guided parts of this work.':
     '：感谢其部分参考实现，为本项目的一些工作提供指引。',
-  ': For using and supporting RapidRAW. Your interest keeps this project alive and evolving.':
-    '：感谢你使用并支持 RapidRAW。你的关注让这个项目持续前进。',
+  ': For using and supporting MonoRin. Your interest keeps this project alive and evolving.':
+    '：感谢你使用并支持 MonoRin。你的关注让这个项目持续前进。',
   You: '你',
   'created by marcinz606 (': '由 marcinz606 创建（',
   'images selected': '张图像已选择',

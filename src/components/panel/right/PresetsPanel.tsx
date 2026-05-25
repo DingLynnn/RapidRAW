@@ -771,7 +771,7 @@ export default function PresetsPanel({ onNavigateToCommunity }: PresetsPanelProp
       const selectedPath = await openDialog({
         filters: [
           { name: 'All Preset Files', extensions: ['rrpreset', 'xmp', 'lrtemplate'] },
-          { name: 'RapidRAW Preset', extensions: ['rrpreset'] },
+          { name: 'MonoRin Preset', extensions: ['rrpreset'] },
           { name: 'Legacy Preset', extensions: ['xmp', 'lrtemplate'] },
         ],
         multiple: false,

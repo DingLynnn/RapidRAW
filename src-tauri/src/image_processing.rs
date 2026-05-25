@@ -3152,8 +3152,79 @@ struct SmartToneStats {
     shadow_percent: f64,
     highlight_percent: f64,
     clipped_percent: f64,
+    sky_percent: f64,
+    foliage_percent: f64,
+    scene: SceneKind,
     temperature_correction: f64,
     tint_correction: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SceneKind {
+    FoodWarm,
+    General,
+    Landscape,
+    Night,
+    Portrait,
+    Snow,
+}
+
+fn rgb_to_hsv(r: f64, g: f64, b: f64) -> (f64, f64, f64) {
+    let max_c = r.max(g).max(b);
+    let min_c = r.min(g).min(b);
+    let delta = max_c - min_c;
+
+    let hue = if delta <= f64::EPSILON {
+        0.0
+    } else if (max_c - r).abs() <= f64::EPSILON {
+        60.0 * (((g - b) / delta) % 6.0)
+    } else if (max_c - g).abs() <= f64::EPSILON {
+        60.0 * (((b - r) / delta) + 2.0)
+    } else {
+        60.0 * (((r - g) / delta) + 4.0)
+    };
+
+    let hue = if hue < 0.0 { hue + 360.0 } else { hue };
+    let saturation = if max_c <= f64::EPSILON {
+        0.0
+    } else {
+        delta / max_c
+    };
+
+    (hue, saturation, max_c)
+}
+
+fn classify_scene(
+    p50: usize,
+    mean_saturation: f64,
+    shadow_percent: f64,
+    highlight_percent: f64,
+    skin_percent: f64,
+    sky_percent: f64,
+    foliage_percent: f64,
+    warm_subject_percent: f64,
+) -> SceneKind {
+    if p50 < 72 && shadow_percent > 0.12 {
+        return SceneKind::Night;
+    }
+
+    if p50 > 170 && mean_saturation < 0.22 && highlight_percent > 0.04 {
+        return SceneKind::Snow;
+    }
+
+    if skin_percent > 0.035 && skin_percent > sky_percent * 0.6 && skin_percent > foliage_percent * 0.5 {
+        return SceneKind::Portrait;
+    }
+
+    if sky_percent + foliage_percent > 0.16 || sky_percent > 0.10 || foliage_percent > 0.14 {
+        return SceneKind::Landscape;
+    }
+
+    if warm_subject_percent > 0.18 && skin_percent < 0.035 && foliage_percent < 0.12 {
+        return SceneKind::FoodWarm;
+    }
+
+    SceneKind::General
 }
 
 fn analyze_smart_tone_stats(image: &DynamicImage) -> SmartToneStats {
@@ -3172,6 +3243,10 @@ fn analyze_smart_tone_stats(image: &DynamicImage) -> SmartToneStats {
     let mut neutral_g = 0.0f64;
     let mut neutral_b = 0.0f64;
     let mut neutral_count = 0.0f64;
+    let mut skin_count = 0.0f64;
+    let mut sky_count = 0.0f64;
+    let mut foliage_count = 0.0f64;
+    let mut warm_subject_count = 0.0f64;
 
     for pixel in rgb_image.pixels() {
         let r = pixel[0] as f64;
@@ -3184,6 +3259,30 @@ fn analyze_smart_tone_stats(image: &DynamicImage) -> SmartToneStats {
         let min_c = r.min(g).min(b);
         let saturation = if max_c > 0.0 { (max_c - min_c) / max_c } else { 0.0 };
         mean_saturation += saturation;
+
+        let (hue, hsv_sat, value) = rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0);
+        let luma_norm = luma / 255.0;
+
+        if (12.0..=52.0).contains(&hue)
+            && (0.18..=0.68).contains(&hsv_sat)
+            && value > 0.28
+            && r > g
+            && g > b * 0.72
+        {
+            skin_count += 1.0;
+        }
+
+        if (185.0..=245.0).contains(&hue) && hsv_sat > 0.18 && luma_norm > 0.28 && b > r * 1.04 {
+            sky_count += 1.0;
+        }
+
+        if (70.0..=165.0).contains(&hue) && hsv_sat > 0.20 && (0.16..=0.82).contains(&luma_norm) {
+            foliage_count += 1.0;
+        }
+
+        if (5.0..=55.0).contains(&hue) && hsv_sat > 0.25 && luma_norm > 0.18 {
+            warm_subject_count += 1.0;
+        }
 
         if (40.0..225.0).contains(&luma) && saturation < 0.35 {
             neutral_r += r;
@@ -3211,6 +3310,21 @@ fn analyze_smart_tone_stats(image: &DynamicImage) -> SmartToneStats {
     let shadow_percent = luma_hist[0..32].iter().sum::<u32>() as f64 / total_pixels;
     let highlight_percent = luma_hist[240..256].iter().sum::<u32>() as f64 / total_pixels;
     let clipped_percent = luma_hist[250..256].iter().sum::<u32>() as f64 / total_pixels;
+    let mean_saturation = mean_saturation / total_pixels;
+    let skin_percent = skin_count / total_pixels;
+    let sky_percent = sky_count / total_pixels;
+    let foliage_percent = foliage_count / total_pixels;
+    let warm_subject_percent = warm_subject_count / total_pixels;
+    let scene = classify_scene(
+        p50,
+        mean_saturation,
+        shadow_percent,
+        highlight_percent,
+        skin_percent,
+        sky_percent,
+        foliage_percent,
+        warm_subject_percent,
+    );
 
     let (temperature_correction, tint_correction) = if neutral_count > total_pixels * 0.01 {
         let avg_r = neutral_r / neutral_count;
@@ -3226,10 +3340,13 @@ fn analyze_smart_tone_stats(image: &DynamicImage) -> SmartToneStats {
     SmartToneStats {
         p50,
         range: (p99 as f64 - p1 as f64).max(1.0),
-        mean_saturation: mean_saturation / total_pixels,
+        mean_saturation,
         shadow_percent,
         highlight_percent,
         clipped_percent,
+        sky_percent,
+        foliage_percent,
+        scene,
         temperature_correction,
         tint_correction,
     }
@@ -3326,8 +3443,24 @@ fn default_hsl() -> serde_json::Value {
     })
 }
 
+fn scene_label(scene: SceneKind) -> &'static str {
+    match scene {
+        SceneKind::FoodWarm => "识别：暖色主体",
+        SceneKind::General => "识别：通用场景",
+        SceneKind::Landscape => "识别：风光",
+        SceneKind::Night => "识别：夜景",
+        SceneKind::Portrait => "识别：人像",
+        SceneKind::Snow => "识别：高调雪景",
+    }
+}
+
+fn with_scene_tag(scene: SceneKind, mut tags: Vec<String>) -> Vec<String> {
+    tags.insert(0, scene_label(scene).to_string());
+    tags
+}
+
 fn smart_tone_tags(stats: SmartToneStats) -> Vec<String> {
-    let mut tags = Vec::new();
+    let mut tags = vec![scene_label(stats.scene).to_string()];
     if stats.range < 150.0 {
         tags.push("低对比".to_string());
     }
@@ -3353,7 +3486,7 @@ fn smart_tone_tags(stats: SmartToneStats) -> Vec<String> {
     if stats.temperature_correction.abs() > 6.0 || stats.tint_correction.abs() > 5.0 {
         tags.push("校正白平衡".to_string());
     }
-    if tags.is_empty() {
+    if tags.len() == 1 {
         tags.push("画面均衡".to_string());
     }
     tags
@@ -3362,9 +3495,65 @@ fn smart_tone_tags(stats: SmartToneStats) -> Vec<String> {
 pub fn generate_smart_tone_suggestions(image: &DynamicImage) -> Vec<SmartToneSuggestion> {
     let auto = perform_auto_analysis(image);
     let stats = analyze_smart_tone_stats(image);
+    let scene = stats.scene;
     let base_tags = smart_tone_tags(stats);
     let confidence = (0.92 - stats.clipped_percent * 10.0 + ((220.0 - stats.range).max(0.0) / 220.0) * 0.04)
         .clamp(0.72, 0.97);
+    let clean_vibrance_delta = match scene {
+        SceneKind::Landscape => 12.0,
+        SceneKind::FoodWarm => 10.0,
+        SceneKind::Portrait => 3.0,
+        SceneKind::Snow => 4.0,
+        _ if stats.mean_saturation < 0.2 => 10.0,
+        _ => 4.0,
+    };
+    let filmic_warmth_delta = match scene {
+        SceneKind::FoodWarm => 10.0,
+        SceneKind::Portrait => 4.0,
+        SceneKind::Night => 3.0,
+        _ => 7.0,
+    };
+    let vivid_contrast_delta = match scene {
+        SceneKind::Portrait => 6.0,
+        SceneKind::Night => 9.0,
+        SceneKind::Snow => 8.0,
+        _ => 15.0,
+    };
+    let vivid_vibrance_delta = match scene {
+        SceneKind::Portrait => 7.0,
+        SceneKind::Landscape => {
+            if stats.sky_percent > stats.foliage_percent {
+                24.0
+            } else {
+                18.0
+            }
+        }
+        SceneKind::FoodWarm => 18.0,
+        _ if stats.mean_saturation < 0.22 => 22.0,
+        _ => 12.0,
+    };
+    let vivid_clarity_delta = match scene {
+        SceneKind::Portrait => 2.0,
+        SceneKind::Night => 4.0,
+        SceneKind::Landscape => 12.0,
+        _ => 10.0,
+    };
+    let vivid_dehaze_delta = match scene {
+        SceneKind::Portrait => 2.0,
+        SceneKind::Night => 4.0,
+        SceneKind::Landscape => 10.0,
+        _ => 8.0,
+    };
+    let soft_saturation = match scene {
+        SceneKind::Portrait => -8.0,
+        SceneKind::FoodWarm => -2.0,
+        _ => -6.0,
+    };
+    let soft_clarity_delta = match scene {
+        SceneKind::Portrait => -9.0,
+        SceneKind::Night => -3.0,
+        _ => -6.0,
+    };
 
     let clean = SmartToneSuggestion {
         id: "ai-balanced".to_string(),
@@ -3376,7 +3565,7 @@ pub fn generate_smart_tone_suggestions(image: &DynamicImage) -> Vec<SmartToneSug
             &auto,
             stats,
             0.0,
-            if stats.mean_saturation < 0.2 { 10.0 } else { 4.0 },
+            clean_vibrance_delta,
             0.0,
             0.0,
             0.0,
@@ -3393,14 +3582,17 @@ pub fn generate_smart_tone_suggestions(image: &DynamicImage) -> Vec<SmartToneSug
         name: "胶片暖调".to_string(),
         description: "暖高光、冷暗部、柔和对比，并加入轻微颗粒。".to_string(),
         confidence: (confidence - 0.04).clamp(0.68, 0.95),
-        tags: vec!["LUT 风格".to_string(), "暖高光".to_string(), "柔和过渡".to_string()],
+        tags: with_scene_tag(
+            scene,
+            vec!["LUT 风格".to_string(), "暖高光".to_string(), "柔和过渡".to_string()],
+        ),
         adjustments: smart_adjustments(
             &auto,
             stats,
             7.0,
             8.0,
             -3.0,
-            7.0,
+            filmic_warmth_delta,
             -2.0,
             0.0,
             point_curve(-8.0, 4.0, -3.0),
@@ -3431,16 +3623,19 @@ pub fn generate_smart_tone_suggestions(image: &DynamicImage) -> Vec<SmartToneSug
         name: "鲜明细节".to_string(),
         description: "增强局部对比、色彩分离和去雾力度。".to_string(),
         confidence: (confidence - 0.02).clamp(0.7, 0.96),
-        tags: vec!["色彩鲜明".to_string(), "细节清晰".to_string(), "适合风光".to_string()],
+        tags: with_scene_tag(
+            scene,
+            vec!["色彩鲜明".to_string(), "细节清晰".to_string(), "适合风光".to_string()],
+        ),
         adjustments: smart_adjustments(
             &auto,
             stats,
-            15.0,
-            if stats.mean_saturation < 0.22 { 22.0 } else { 12.0 },
+            vivid_contrast_delta,
+            vivid_vibrance_delta,
             4.0,
             1.0,
-            10.0,
-            8.0,
+            vivid_clarity_delta,
+            vivid_dehaze_delta,
             point_curve(-10.0, 2.0, 10.0),
             default_color_grading(),
             json!({
@@ -3462,15 +3657,18 @@ pub fn generate_smart_tone_suggestions(image: &DynamicImage) -> Vec<SmartToneSug
         name: "柔和自然".to_string(),
         description: "柔和提亮暗部、降低饱和度，并平滑高光对比。".to_string(),
         confidence: (confidence - 0.03).clamp(0.69, 0.95),
-        tags: vec!["自然肤色".to_string(), "柔和对比".to_string(), "温和色彩".to_string()],
+        tags: with_scene_tag(
+            scene,
+            vec!["自然肤色".to_string(), "柔和对比".to_string(), "温和色彩".to_string()],
+        ),
         adjustments: smart_adjustments(
             &auto,
             stats,
             -5.0,
             4.0,
-            -6.0,
+            soft_saturation,
             3.0,
-            -6.0,
+            soft_clarity_delta,
             -2.0,
             point_curve(6.0, 4.0, -6.0),
             json!({
@@ -3495,7 +3693,20 @@ pub fn generate_smart_tone_suggestions(image: &DynamicImage) -> Vec<SmartToneSug
         ),
     };
 
-    vec![clean, filmic, vivid, soft]
+    let mut suggestions = match scene {
+        SceneKind::FoodWarm => vec![filmic, vivid, clean, soft],
+        SceneKind::Landscape => vec![vivid, clean, filmic, soft],
+        SceneKind::Night => vec![clean, filmic, soft, vivid],
+        SceneKind::Portrait => vec![soft, clean, filmic, vivid],
+        SceneKind::Snow => vec![clean, soft, filmic, vivid],
+        SceneKind::General => vec![clean, filmic, vivid, soft],
+    };
+
+    if let Some(first) = suggestions.first_mut() {
+        first.tags.insert(0, "推荐".to_string());
+    }
+
+    suggestions
 }
 
 #[tauri::command]

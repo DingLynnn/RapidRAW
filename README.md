@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/assets/.github/assets/editor.png" alt="RapidRAW Editor">
+  <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/assets/.github/assets/editor.png" alt="MonoRin Editor">
 </p>
 
 <div align="center">
@@ -11,17 +11,17 @@
 [![AGPL-3.0](https://img.shields.io/badge/License-AGPL_v3-blue.svg?style=for-the-badge)](https://opensource.org/licenses/AGPL-3.0)
 [![GitHub stars](https://img.shields.io/github/stars/CyberTimon/RapidRAW?style=for-the-badge&logo=github&label=Stars)](https://github.com/CyberTimon/RapidRAW/stargazers)
 <br>
-[![www.getrapidraw.com](https://img.shields.io/badge/getrapidraw.com-%232ea44f?style=for-the-badge&logo=safari&logoColor=white)](https://www.getrapidraw.com)
+[![www.getmonorin.com](https://img.shields.io/badge/getrapidraw.com-%232ea44f?style=for-the-badge&logo=safari&logoColor=white)](https://www.getrapidraw.com)
 [![Instagram](https://img.shields.io/badge/Instagram-%23E4405F.svg?style=for-the-badge&logo=Instagram&logoColor=white)](https://www.instagram.com/getrapidraw/)
 [![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/cvFugZ2Hw8)
 
 </div>
 
-# RapidRAW
+# MonoRin
 
 > A beautiful, non-destructive, and GPU-accelerated RAW image editor built with performance in mind.
 
-RapidRAW is a modern, high-performance alternative to Adobe Lightroom®. It delivers a simple, beautiful editing experience in a lightweight package (under 20MB) for Windows, macOS, and Linux.
+MonoRin is a modern, high-performance alternative to Adobe Lightroom®. It delivers a simple, beautiful editing experience in a lightweight package (under 20MB) for Windows, macOS, and Linux.
 
 I started developing this project as a personal challenge when I was 18. My goal was to create a high-performance tool for my own photography workflow while deepening my understanding of React, WGSL and Rust, with the support from Google Gemini.
 
@@ -30,9 +30,9 @@ I started developing this project as a personal challenge when I was 18. My goal
     <td width="50%" valign="top" align="center">
       <br>
       <a href="https://github.com/CyberTimon/RapidRAW/releases/latest">
-        <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/src-tauri/icons/full_res_original.png" alt="Download RapidRAW" height="96">
+        <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/src-tauri/icons/full_res_original.png" alt="Download MonoRin" height="96">
       </a>
-      <h3>Download RapidRAW</h3>
+      <h3>Download MonoRin</h3>
       <p>Get the latest release for Windows, macOS, and Linux. Packaged and ready to run.</p>
       <strong><a href="https://github.com/CyberTimon/RapidRAW/releases/latest">Download Latest Version →</a></strong>
       <br><br>
@@ -43,7 +43,7 @@ I started developing this project as a personal challenge when I was 18. My goal
         <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/main/src-tauri/icons/docs.png" alt="Read the Docs" height="96">
       </a>
       <h3>Read the Docs</h3>
-      <p>Learn how RapidRAW works with step-by-step tutorials, from adjustments to masking.</p>
+      <p>Learn how MonoRin works with step-by-step tutorials, from adjustments to masking.</p>
       <strong><a href="https://www.getrapidraw.com/docs/">View Tutorials & Docs →</a></strong>
       <br><br>
     </td>
@@ -52,9 +52,9 @@ I started developing this project as a personal challenge when I was 18. My goal
 
 <details>
 <summary><strong>For Who Is This?</strong></summary>
-RapidRAW is for photographers who love to edit their photos in a <strong>clean, fast, and simple workflow</strong>. It prioritizes speed, a beautiful user interface, and powerful tools that let you achieve your creative color vision quickly.
+MonoRin is for photographers who love to edit their photos in a <strong>clean, fast, and simple workflow</strong>. It prioritizes speed, a beautiful user interface, and powerful tools that let you achieve your creative color vision quickly.
 <br><br>
-RapidRAW is still in active development and isn't yet as polished as mature tools like Darktable, RawTherapee, or Adobe Lightroom®. Right now, the focus is on building a fast, enjoyable core editing experience. You may encounter bugs - if you do, please report them so I can fix them :) Your feedback really helps!
+MonoRin is still in active development and isn't yet as polished as mature tools like Darktable, RawTherapee, or Adobe Lightroom®. Right now, the focus is on building a fast, enjoyable core editing experience. You may encounter bugs - if you do, please report them so I can fix them :) Your feedback really helps!
 <br><br>
 </details>
 <details>
@@ -142,7 +142,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 - **2026-01-17:** Refactor AI panel to correctly work with the new masking system
 - **2026-01-16:** Major masking system overhaul with drag & drop, per-mask opacity/invert & UI improvements
 - **2026-01-13:** New python middleware client for external generative AI integration (ComfyUI)
-- **2026-01-12:** Created a RapidRAW community discord server
+- **2026-01-12:** Created a MonoRin community discord server
 - **2026-01-11:** Separate preview worker, optional high-quality live previews & mask/ai patch caching
 - **2026-01-10:** Enhanced EXIF UI, optimized color wheels/curves & rawler update
 - **2026-01-09:** Live previews for all adjustments & masks with optimized GPU processing
@@ -197,7 +197,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 - **2025-09-17:** Automatic image culling (duplicate & blur detection)
 - **2025-09-14:** Grid previews in community panel & improved ComfyUi workflow
 - **2025-09-12:** New community presets panel to share & showcase presets
-- **2025-09-10:** Extended generative AI roadmap & started building RapidRAW website
+- **2025-09-10:** Extended generative AI roadmap & started building MonoRin website
 - **2025-09-09:** Many shader improvements & bug fixes, invert tint slider
 - **2025-09-06:** New update notifier that alerts users when a new version becomes available
 - **2025-09-04:** Added toggleable clipping warnings (blue = shadows, red = highlights)
@@ -231,7 +231,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 - **2025-07-22:** Significant improvements to the shader: More accurate exposure slider, better tone mapper (simplified ACES)
 - **2025-07-21:** Remember scroll position when going into the editing section
 - **2025-07-20:** Ability to add presets to folders, export preset folders etc, preset _animations_
-- **2025-07-20:** Tutorials on how to use RapidRAW
+- **2025-07-20:** Tutorials on how to use MonoRin
 - **2025-07-19:** Initial color negative conversion implementation, shader improvements
 - **2025-07-19:** New color wheels, persistent collapsed / expanded state for UI elements
 - **2025-07-19:** Fixed banding & purple artefacts on RAW images, better color noise reduction, show exposure in stops
@@ -333,7 +333,7 @@ RapidRAW is still in active development and isn't yet as polished as mature tool
 
 ## Demo & Screenshots
 
-Here's RapidRAW in action.
+Here's MonoRin in action.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/CyberTimon/RapidRAW/assets/.github/assets/editor.gif" alt="The main editor interface in action"></img><br>
@@ -399,18 +399,18 @@ While the core functionality is in place, I'm actively working on improving seve
 | ---------------------------------------------------------------------------------------------------------- | -------- | ---------- | ------ |
 | Find a better X-Trans demosaicing algorithm                                                                | Medium   | High       | [ ]    |
 | Refactoring the frontend (reduce prop drilling in React components)                                        | Low      | Medium     | [X]    |
-| Write a tutorial on how to connect ComfyUI with RapidRAW                                                   | Medium   | Medium     | [ ]    |
+| Write a tutorial on how to connect ComfyUI with MonoRin                                                   | Medium   | Medium     | [ ]    |
 | Centralize Coordinate Transformation Logic - See [#245](https://github.com/CyberTimon/RapidRAW/issues/245) | Medium   | High       | [X]    |
 | Improve speed on older systems (e.g. Pascal GPUs)                                                          | Medium   | High       | [X]    |
 | Implement warping tools                                                                                    | Low      | High       | [X]    |
 
 ## AI Roadmap
 
-I've designed RapidRAW's AI features with flexibility in mind. You have three ways to use them, giving you the choice between fast local tools, powerful self-hosting, and simple cloud convenience.
+I've designed MonoRin's AI features with flexibility in mind. You have three ways to use them, giving you the choice between fast local tools, powerful self-hosting, and simple cloud convenience.
 
 ### 1. Built-in AI Tools (Local & Free)
 
-These features are integrated directly into RapidRAW and run entirely on your computer. They are fast, free, and require no setup from you.
+These features are integrated directly into MonoRin and run entirely on your computer. They are fast, free, and require no setup from you.
 
 - **AI Masking:** Instantly detect and mask subjects, skies, and foregrounds.
 - **Automatic Tagging:** The image library is automatically tagged with keywords using a local CLIP model, making your photos easy to search.
@@ -418,7 +418,7 @@ These features are integrated directly into RapidRAW and run entirely on your co
 
 ### 2. Self-Hosted Integration with ComfyUI (Local & Free)
 
-For users with a capable GPU who want maximum control, RapidRAW can connect to your own local [ComfyUI](https://github.com/comfyanonymous/ComfyUI) server. This is managed by the [**RapidRAW-AI-Connector**](https://github.com/CyberTimon/RapidRAW-AI-Connector), a lightweight middleware that bridges RapidRAW and ComfyUI. Its purpose is to manage image caching, workflow injection, and AI coordination.
+For users with a capable GPU who want maximum control, MonoRin can connect to your own local [ComfyUI](https://github.com/comfyanonymous/ComfyUI) server. This is managed by the [**MonoRin-AI-Connector**](https://github.com/CyberTimon/RapidRAW-AI-Connector), a lightweight middleware that bridges MonoRin and ComfyUI. Its purpose is to manage image caching, workflow injection, and AI coordination.
 
 **Why this approach?** This new architecture makes generative edits much more efficient. Instead of sending the entire high-resolution image for every single change, the AI Connector intelligently caches it. The full image is sent only once; for every subsequent edit, only the tiny mask and text are transferred. This makes the process significantly faster and more responsive.
 
@@ -430,7 +430,7 @@ This setup gives you the best of both worlds: a highly efficient workflow while 
 
 ### 3. Optional Cloud Service (Subscription)
 
-To be clear, **I won't lock features behind a paywall.** All of RapidRAW's functionality is available for free if you use the built-in tools or self-host.
+To be clear, **I won't lock features behind a paywall.** All of MonoRin's functionality is available for free if you use the built-in tools or self-host.
 
 However, I realize that not everyone has the powerful hardware or technical desire to set up and maintain their own ComfyUI server. For those who want a simpler solution, I will be offering an optional **$TBD/month subscription**.
 
@@ -479,7 +479,7 @@ This project began as an intensive sprint to build the core functionality. Here'
 
 ## Getting Started
 
-You have two options to run RapidRAW:
+You have two options to run MonoRin:
 
 **1. Download the Latest Release (Recommended)**
 
@@ -491,7 +491,7 @@ You have two options to run RapidRAW:
 
 - The official Flatpak package supports all Linux distributions and is available on [**Flathub**](https://flathub.org/apps/io.github.CyberTimon.RapidRAW).
 - On Debian-based distributions, install the `.deb` package from the [**Releases**](https://github.com/CyberTimon/RapidRAW/releases) page.
-- On Arch-based distributions, use the [`rapidraw-bin`](https://aur.archlinux.org/packages/rapidraw-bin) package from the AUR.
+- On Arch-based distributions, use the [`monorin-bin`](https://aur.archlinux.org/packages/rapidraw-bin) package from the AUR.
 
 **2. Build from Source**
 
@@ -500,7 +500,7 @@ If you want to build the project yourself, you'll need to have [Rust](https://ww
 ```bash
 # 1. Clone the repository
 git clone https://github.com/CyberTimon/RapidRAW.git
-cd RapidRAW
+cd MonoRin
 
 # 2. Install frontend dependencies
 npm install
@@ -511,7 +511,7 @@ npm start
 
 ## System Requirements
 
-RapidRAW is built to be lightweight and cross-platform. The minimum (tested) requirements are:
+MonoRin is built to be lightweight and cross-platform. The minimum (tested) requirements are:
 
 **Operating System:**
 
@@ -522,7 +522,7 @@ RapidRAW is built to be lightweight and cross-platform. The minimum (tested) req
 **Hardware Recommendations:**
 
 - **RAM:** **16GB or more is highly recommended.** While the application may run on systems with less memory, performance is best with 16GB+ to handle high-resolution RAW files, undo history, and complex layer masking without slowdowns.
-- **GPU:** A dedicated GPU is recommended. RapidRAW relies heavily on GPU acceleration for its processing pipeline. Very old GPU architectures (generally pre-2015) or older integrated graphics may struggle, leading to instability or graphical artifacts.
+- **GPU:** A dedicated GPU is recommended. MonoRin relies heavily on GPU acceleration for its processing pipeline. Very old GPU architectures (generally pre-2015) or older integrated graphics may struggle, leading to instability or graphical artifacts.
 
 ### Common Problems
 
@@ -541,19 +541,19 @@ If the application crashes immediately when you try to start editing a picture, 
 <details>
 <summary>Linux Wayland/WebKit Crash</summary>
 
-If RapidRAW crashes on Wayland (e.g. GNOME + NVIDIA), try launching it with:
+If MonoRin crashes on Wayland (e.g. GNOME + NVIDIA), try launching it with:
 
 ```bash
-WEBKIT_DISABLE_DMABUF_RENDERER=1 RapidRAW
+WEBKIT_DISABLE_DMABUF_RENDERER=1 MonoRin
 ```
 
 or
 
 ```bash
-WEBKIT_DISABLE_COMPOSITING_MODE=1 RapidRAW
+WEBKIT_DISABLE_COMPOSITING_MODE=1 MonoRin
 ```
 
-This issue is related to **WebKit** and **NVIDIA drivers**, not RapidRAW directly. Switching to **X11** or using **AMD / Intel GPUs** may also help.
+This issue is related to **WebKit** and **NVIDIA drivers**, not MonoRin directly. Switching to **X11** or using **AMD / Intel GPUs** may also help.
 
 See [#306](https://github.com/CyberTimon/RapidRAW/issues/306) for more information.
 
@@ -561,11 +561,11 @@ See [#306](https://github.com/CyberTimon/RapidRAW/issues/306) for more informati
 
 ## Contributing
 
-I’m really grateful for any contributions you make to RapidRAW! Whether you’re reporting a bug, suggesting a new feature, or submitting a pull request - your input helps shape the project and makes it better for everyone. Don’t hesitate to open an issue or share your ideas.
+I’m really grateful for any contributions you make to MonoRin! Whether you’re reporting a bug, suggesting a new feature, or submitting a pull request - your input helps shape the project and makes it better for everyone. Don’t hesitate to open an issue or share your ideas.
 
 ### Image format issues
 
-If your camera’s RAW files aren’t supported, please open a issue here first: [rawler issues](https://github.com/dnglab/dnglab/issues). Once support is added in rawler, create a issue for RapidRAW so I can update the packages and keep everything in sync.
+If your camera’s RAW files aren’t supported, please open a issue here first: [rawler issues](https://github.com/dnglab/dnglab/issues). Once support is added in rawler, create a issue for MonoRin so I can update the packages and keep everything in sync.
 
 ### Feature requests
 
@@ -573,7 +573,7 @@ Got an idea? Add it in the discussion tab with the **"idea"** tag. This way, the
 
 ## Special Thanks
 
-A huge thank you to the following projects and tools that were very important in the development of RapidRAW:
+A huge thank you to the following projects and tools that were very important in the development of MonoRin:
 
 - **[Google AI Studio](https://aistudio.google.com):** For providing amazing assistance in researching, implementing image processing algorithms and giving an overall speed boost.
 - **[rawler](https://github.com/dnglab/dnglab/tree/main/rawler):** For the excellent Rust crate that provides the foundation for RAW file processing in this project.
@@ -582,15 +582,15 @@ A huge thank you to the following projects and tools that were very important in
 - **[SAM 2](https://github.com/facebookresearch/sam2):** For providing the foundation model used for the AI subject detection capabilities.
 - **[U-2-Net](https://github.com/xuebinqin/U-2-Net):** For providing the robust architecture used for the AI sky and foreground detection capabilities.
 - **[Depth Anything V2](https://github.com/DepthAnything/Depth-Anything-V2):** For the powerful monocular depth estimation model that enables the AI depth masking capabilities.
-- **[nind-denoise](https://github.com/trougnouf/nind-denoise):** For providing AI models that power the AI noise reduction capabilities in RapidRAW.
+- **[nind-denoise](https://github.com/trougnouf/nind-denoise):** For providing AI models that power the AI noise reduction capabilities in MonoRin.
 - **[NegPy](https://github.com/marcinz606/NegPy):** For the inspiration behind the negative conversion logic, particularly the mathematical approach to film inversion using characteristic curves.
 - **[pixls.us](https://discuss.pixls.us/):** For being an incredible community full of knowledgeable people who offered inspiration, advice, and ideas.
 - **[darktable & co.](https://github.com/darktable-org/darktable):** For some reference implementations that guided parts of this work.
-- **You:** For using and supporting RapidRAW. Your interest keeps this project alive and evolving.
+- **You:** For using and supporting MonoRin. Your interest keeps this project alive and evolving.
 
 ## Support the Project
 
-As an 18-year-old developer balancing this project with an apprenticeship, your support means the world. If you find RapidRAW useful or exciting, please consider donating to help me dedicate more time to its development and cover any associated costs.
+As an 18-year-old developer balancing this project with an apprenticeship, your support means the world. If you find MonoRin useful or exciting, please consider donating to help me dedicate more time to its development and cover any associated costs.
 
 - **Ko-fi:** [Donate on Ko-fi](https://ko-fi.com/cybertimon)
 - **Crypto:**
@@ -600,6 +600,6 @@ As an 18-year-old developer balancing this project with an apprenticeship, your 
 
 ## License & Philosophy
 
-This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**. I chose this license to ensure that RapidRAW and any of its derivatives will always remain open-source and free for the community. It protects the project from being used in closed-source commercial software, ensuring that improvements benefit everyone.
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**. I chose this license to ensure that MonoRin and any of its derivatives will always remain open-source and free for the community. It protects the project from being used in closed-source commercial software, ensuring that improvements benefit everyone.
 
 See the [LICENSE](LICENSE) file for more details.

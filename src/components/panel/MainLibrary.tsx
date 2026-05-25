@@ -237,7 +237,7 @@ export default function MainLibrary(props: MainLibraryProps) {
               ) : (
                 <>
                   <div className="my-auto text-left relative z-10">
-                    <Text variant={TextVariants.displayLarge}>RapidRAW</Text>
+                    <Text variant={TextVariants.displayLarge}>MonoRin</Text>
                     <Text
                       variant={TextVariants.heading}
                       color={TextColors.secondary}
