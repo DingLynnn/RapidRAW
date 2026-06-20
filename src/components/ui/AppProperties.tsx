@@ -1,7 +1,6 @@
 import { ExportPreset } from './ExportImportProperties';
 import { Adjustments, CopyPasteSettings } from '../../utils/adjustments';
 import { ToolType } from '../panel/right/Masks';
-import type { Language } from '../../i18n/translations';
 
 export const GLOBAL_KEYS = [
   ' ',
@@ -36,9 +35,7 @@ export enum Invokes {
   ApplyAdjustmentsToPaths = 'apply_adjustments_to_paths',
   ApplyAutoAdjustmentsToPaths = 'apply_auto_adjustments_to_paths',
   ApplyDenoising = 'apply_denoising',
-  BatchExportImages = 'batch_export_images',
   CalculateAutoAdjustments = 'calculate_auto_adjustments',
-  CalculateSmartToneSuggestions = 'calculate_smart_tone_suggestions',
   CancelExport = 'cancel_export',
   CheckAIConnectorStatus = 'check_ai_connector_status',
   ClearAllSidecars = 'clear_all_sidecars',
@@ -51,9 +48,8 @@ export enum Invokes {
   CullImages = 'cull_images',
   DeleteFolder = 'delete_folder',
   DuplicateFile = 'duplicate_file',
-  EstimateBatchExportSize = 'estimate_batch_export_size',
-  EstimateExportSize = 'estimate_export_size',
-  ExportImage = 'export_image',
+  EstimateExportSizes = 'estimate_export_sizes',
+  ExportImages = 'export_images',
   FrontendLog = 'frontend_log',
   GenerateAiForegroundMask = 'generate_ai_foreground_mask',
   GenerateAiSkyMask = 'generate_ai_sky_mask',
@@ -114,6 +110,12 @@ export enum Invokes {
   GetAlbumImages = 'get_album_images',
 }
 
+export enum ExifOverlay {
+  Off = 'off',
+  Hover = 'hover',
+  Always = 'always',
+}
+
 export enum Panel {
   Adjustments = 'adjustments',
   Ai = 'ai',
@@ -133,7 +135,7 @@ export enum RawStatus {
 
 export enum SortDirection {
   Ascending = 'asc',
-  Descening = 'desc',
+  Descending = 'desc',
 }
 
 export enum Theme {
@@ -180,6 +182,7 @@ export interface AppSettings {
   exportPresets?: ExportPreset[];
   myLenses?: any;
   enableFolderImageCounts?: boolean;
+  displayEditIcon?: boolean;
   linearRawMode?: string;
   enableXmpSync?: boolean;
   createXmpIfMissing?: boolean;
@@ -190,7 +193,6 @@ export interface AppSettings {
   canvasInputMode?: 'mouse' | 'trackpad';
   zoomSpeedMultiplier?: number;
   keybinds?: { [action: string]: string[] };
-  language?: Language;
   tonemapperOverrideEnabled?: boolean;
   defaultRawTonemapper?: string;
   defaultNonRawTonemapper?: string;
@@ -198,6 +200,8 @@ export interface AppSettings {
   enableFocusMode?: boolean;
   openTreeSections?: string[];
   folderIcons?: Record<string, string>;
+  exifOverlay?: ExifOverlay;
+  language?: string;
 }
 
 export interface BrushSettings {
@@ -211,10 +215,19 @@ export enum LibraryViewMode {
   Recursive = 'recursive',
 }
 
+export const EditedStatus = {
+  All: 'all',
+  EditedOnly: 'editedOnly',
+  UneditedOnly: 'uneditedOnly',
+} as const;
+
+export type EditedStatus = (typeof EditedStatus)[keyof typeof EditedStatus];
+
 export interface FilterCriteria {
   colors: Array<string>;
   rating: number;
   rawStatus: RawStatus;
+  editedStatus?: EditedStatus;
 }
 
 export interface Folder {

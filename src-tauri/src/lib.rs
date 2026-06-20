@@ -1226,8 +1226,6 @@ async fn generate_all_community_previews(
     const PROCESSING_DIM: u32 = TILE_DIM * 2;
 
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
-    let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
-    let linear_mode = settings.linear_raw_mode;
 
     let mut base_thumbnails: Vec<(DynamicImage, bool, f32)> = Vec::new();
     for image_path in image_paths.iter() {
@@ -1238,8 +1236,7 @@ async fn generate_all_community_previews(
             &image_bytes,
             &source_path_str,
             true,
-            highlight_compression,
-            linear_mode.clone(),
+            &settings,
             None,
         )
         .map_err(|e| e.to_string())?;
@@ -1411,8 +1408,6 @@ async fn merge_hdr(
 
     let hdr_result_handle = state.hdr_result.clone();
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
-    let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
-    let linear_mode = settings.linear_raw_mode;
 
     let loaded_items: Vec<(String, DynamicImage, Duration, f32)> = paths
         .iter()
@@ -1430,15 +1425,9 @@ async fn merge_hdr(
 
             let file_bytes =
                 fs::read(path).map_err(|e| format!("Failed to read image {}: {}", path, e))?;
-            let mut dynamic_image = load_base_image_from_bytes(
-                &file_bytes,
-                path,
-                false,
-                highlight_compression,
-                linear_mode.clone(),
-                None,
-            )
-            .map_err(|e| format!("Failed to load image {}: {}", path, e))?;
+            let mut dynamic_image =
+                load_base_image_from_bytes(&file_bytes, path, false, &settings, None)
+                    .map_err(|e| format!("Failed to load image {}: {}", path, e))?;
 
             if !crate::formats::is_raw_file(path) {
                 dynamic_image = apply_srgb_to_linear(dynamic_image);
@@ -1604,8 +1593,6 @@ fn generate_preview_for_path(
     let source_path_str = source_path.to_string_lossy().to_string();
     let is_raw = is_raw_file(&source_path_str);
     let settings = load_settings(app_handle.clone()).unwrap_or_default();
-    let highlight_compression = settings.raw_highlight_compression.unwrap_or(2.5);
-    let linear_mode = settings.linear_raw_mode.clone();
 
     let base_image = match read_file_mapped(&source_path) {
         Ok(mmap) => load_and_composite(
@@ -1613,8 +1600,7 @@ fn generate_preview_for_path(
             &source_path_str,
             &js_adjustments,
             false,
-            highlight_compression,
-            linear_mode.clone(),
+            &settings,
             None,
         )
         .map_err(|e| e.to_string())?,
@@ -1630,8 +1616,7 @@ fn generate_preview_for_path(
                 &source_path_str,
                 &js_adjustments,
                 false,
-                highlight_compression,
-                linear_mode.clone(),
+                &settings,
                 None,
             )
             .map_err(|e| e.to_string())?
@@ -1987,7 +1972,7 @@ pub fn run() {
 
             let lens_db = lens_correction::load_lensfun_db(&app_handle);
             let state = app.state::<AppState>();
-            *state.lens_db.lock().unwrap() = Some(lens_db);
+            *state.lens_db.lock().unwrap() = Some(Arc::new(lens_db));
 
             unsafe {
                 if let Some(backend) = &settings.processing_backend
@@ -2069,6 +2054,9 @@ pub fn run() {
             }
 
             let window = window_builder.build().expect("Failed to build window");
+
+            #[cfg(target_os = "android")]
+            android_integration::initialize_android(&window);
 
             #[cfg(not(target_os = "android"))]
             {
@@ -2252,7 +2240,8 @@ pub fn run() {
             cancel_thumbnail_generation,
             update_wgpu_transform,
             android_integration::resolve_android_content_uri_name,
-            adjustment_utils::clear_session_caches,
+            cache_utils::clear_session_caches,
+            cache_utils::clear_image_caches,
             app_settings::load_settings,
             app_settings::save_settings,
             ai_commands::generate_ai_subject_mask,
@@ -2270,11 +2259,9 @@ pub fn run() {
             image_loader::is_image_cached,
             panorama_stitching::stitch_panorama,
             panorama_stitching::save_panorama,
-            export_processing::export_image,
-            export_processing::batch_export_images,
+            export_processing::export_images,
             export_processing::cancel_export,
-            export_processing::estimate_export_size,
-            export_processing::estimate_batch_export_size,
+            export_processing::estimate_export_sizes,
             image_processing::calculate_auto_adjustments,
             image_processing::calculate_smart_tone_suggestions,
             mask_generation::generate_mask_overlay,
