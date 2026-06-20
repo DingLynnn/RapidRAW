@@ -50,6 +50,7 @@ import {
   ThumbnailSize,
   ThumbnailAspectRatio,
 } from './components/ui/AppProperties';
+import { Status } from './components/ui/ExportImportProperties';
 
 import ImageProcessingManager from './components/managers/ImageProcessingManager';
 import ImageLoaderManager from './components/managers/ImageLoaderManager';
@@ -170,6 +171,20 @@ function App() {
   useEffect(() => {
     selectedImagePathRef.current = selectedImage?.path ?? null;
   }, [selectedImage?.path]);
+
+  useEffect(() => {
+    if (exportState.status !== Status.Success) return;
+
+    const resetHandle = window.setTimeout(() => {
+      setExportState({
+        errorMessage: '',
+        progress: { current: 0, total: 0 },
+        status: Status.Idle,
+      });
+    }, 10000);
+
+    return () => window.clearTimeout(resetHandle);
+  }, [exportState.status, setExportState]);
 
   const prevAdjustmentsRef = useRef<any>(null);
 

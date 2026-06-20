@@ -6,8 +6,12 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use ab_glyph::{FontArc, PxScale};
 use image::codecs::jpeg::JpegEncoder;
-use image::{DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, imageops};
+use image::{
+    DynamicImage, GenericImageView, GrayImage, ImageBuffer, ImageFormat, Luma, Rgba, imageops,
+};
+use imageproc::drawing::{draw_text_mut, text_size};
 use jxl_encoder::{LosslessConfig, LossyConfig, PixelLayout};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -89,19 +93,104 @@ pub enum WatermarkAnchor {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+pub enum WatermarkType {
+    Image,
+    Text,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct WatermarkSettings {
-    pub path: String,
+    #[serde(rename = "type", default)]
+    pub watermark_type: Option<WatermarkType>,
+    #[serde(default)]
+    pub path: Option<String>,
+    #[serde(default)]
+    pub text: Option<String>,
+    #[serde(default)]
+    pub font_path: Option<String>,
+    #[serde(default = "default_watermark_font_size")]
+    pub font_size: f32,
     pub anchor: WatermarkAnchor,
     pub scale: f32,
     pub spacing: f32,
     pub opacity: f32,
 }
 
+fn default_watermark_font_size() -> f32 {
+    5.0
+}
+
+fn calculate_watermark_position(
+    base_w: u32,
+    base_h: u32,
+    wm_w: u32,
+    wm_h: u32,
+    spacing_pixels: i64,
+    anchor: &WatermarkAnchor,
+) -> (i64, i64) {
+    let x = match anchor {
+        WatermarkAnchor::TopLeft | WatermarkAnchor::CenterLeft | WatermarkAnchor::BottomLeft => {
+            spacing_pixels
+        }
+        WatermarkAnchor::TopCenter | WatermarkAnchor::Center | WatermarkAnchor::BottomCenter => {
+            (base_w as i64 - wm_w as i64) / 2
+        }
+        WatermarkAnchor::TopRight | WatermarkAnchor::CenterRight | WatermarkAnchor::BottomRight => {
+            base_w as i64 - wm_w as i64 - spacing_pixels
+        }
+    };
+
+    let y = match anchor {
+        WatermarkAnchor::TopLeft | WatermarkAnchor::TopCenter | WatermarkAnchor::TopRight => {
+            spacing_pixels
+        }
+        WatermarkAnchor::CenterLeft | WatermarkAnchor::Center | WatermarkAnchor::CenterRight => {
+            (base_h as i64 - wm_h as i64) / 2
+        }
+        WatermarkAnchor::BottomLeft
+        | WatermarkAnchor::BottomCenter
+        | WatermarkAnchor::BottomRight => base_h as i64 - wm_h as i64 - spacing_pixels,
+    };
+
+    (x, y)
+}
+
 fn apply_watermark(
     base_image: &mut DynamicImage,
     watermark_settings: &WatermarkSettings,
 ) -> Result<(), String> {
-    let watermark_img = image::open(&watermark_settings.path)
+    let watermark_type = watermark_settings
+        .watermark_type
+        .clone()
+        .unwrap_or_else(|| {
+            if watermark_settings
+                .text
+                .as_deref()
+                .is_some_and(|text| !text.trim().is_empty())
+                && watermark_settings.path.is_none()
+            {
+                WatermarkType::Text
+            } else {
+                WatermarkType::Image
+            }
+        });
+
+    match watermark_type {
+        WatermarkType::Image => apply_image_watermark(base_image, watermark_settings),
+        WatermarkType::Text => apply_text_watermark(base_image, watermark_settings),
+    }
+}
+
+fn apply_image_watermark(
+    base_image: &mut DynamicImage,
+    watermark_settings: &WatermarkSettings,
+) -> Result<(), String> {
+    let watermark_path = watermark_settings
+        .path
+        .as_deref()
+        .ok_or_else(|| "Watermark image path is missing.".to_string())?;
+    let watermark_img = image::open(watermark_path)
         .map_err(|e| format!("Failed to open watermark image: {}", e))?;
 
     let (base_w, base_h) = base_image.dimensions();
@@ -129,31 +218,76 @@ fn apply_watermark(
     let spacing_pixels = (base_min_dim * (watermark_settings.spacing / 100.0)) as i64;
     let (wm_w, wm_h) = final_watermark.dimensions();
 
-    let x = match watermark_settings.anchor {
-        WatermarkAnchor::TopLeft | WatermarkAnchor::CenterLeft | WatermarkAnchor::BottomLeft => {
-            spacing_pixels
-        }
-        WatermarkAnchor::TopCenter | WatermarkAnchor::Center | WatermarkAnchor::BottomCenter => {
-            (base_w as i64 - wm_w as i64) / 2
-        }
-        WatermarkAnchor::TopRight | WatermarkAnchor::CenterRight | WatermarkAnchor::BottomRight => {
-            base_w as i64 - wm_w as i64 - spacing_pixels
-        }
-    };
-
-    let y = match watermark_settings.anchor {
-        WatermarkAnchor::TopLeft | WatermarkAnchor::TopCenter | WatermarkAnchor::TopRight => {
-            spacing_pixels
-        }
-        WatermarkAnchor::CenterLeft | WatermarkAnchor::Center | WatermarkAnchor::CenterRight => {
-            (base_h as i64 - wm_h as i64) / 2
-        }
-        WatermarkAnchor::BottomLeft
-        | WatermarkAnchor::BottomCenter
-        | WatermarkAnchor::BottomRight => base_h as i64 - wm_h as i64 - spacing_pixels,
-    };
+    let (x, y) = calculate_watermark_position(
+        base_w,
+        base_h,
+        wm_w,
+        wm_h,
+        spacing_pixels,
+        &watermark_settings.anchor,
+    );
 
     image::imageops::overlay(base_image, &final_watermark, x, y);
+
+    Ok(())
+}
+
+fn load_watermark_font(font_path: Option<&str>) -> Result<FontArc, String> {
+    if let Some(path) = font_path {
+        let font_bytes =
+            fs::read(path).map_err(|e| format!("Failed to read watermark font: {}", e))?;
+        return FontArc::try_from_vec(font_bytes)
+            .map_err(|_| "Failed to parse watermark font.".to_string());
+    }
+
+    FontArc::try_from_slice(include_bytes!("../../Bradley Hand ITC.TTF") as &[u8])
+        .map_err(|_| "Failed to load built-in watermark font.".to_string())
+}
+
+fn apply_text_watermark(
+    base_image: &mut DynamicImage,
+    watermark_settings: &WatermarkSettings,
+) -> Result<(), String> {
+    let text = watermark_settings.text.as_deref().unwrap_or("").trim();
+    if text.is_empty() {
+        return Ok(());
+    }
+
+    let font = load_watermark_font(watermark_settings.font_path.as_deref())?;
+    let (base_w, base_h) = base_image.dimensions();
+    let base_min_dim = base_w.min(base_h) as f32;
+    let font_px = (base_min_dim * (watermark_settings.font_size / 100.0)).max(1.0);
+    let scale = PxScale::from(font_px);
+    let single_line_text = text.replace(['\r', '\n'], " ");
+    let (text_w, text_h) = text_size(scale, &font, &single_line_text);
+
+    if text_w == 0 || text_h == 0 {
+        return Ok(());
+    }
+
+    let spacing_pixels = (base_min_dim * (watermark_settings.spacing / 100.0)) as i64;
+    let (x, y) = calculate_watermark_position(
+        base_w,
+        base_h,
+        text_w,
+        text_h,
+        spacing_pixels,
+        &watermark_settings.anchor,
+    );
+
+    let opacity = (watermark_settings.opacity / 100.0).clamp(0.0, 1.0);
+    let alpha = (opacity * 255.0).round() as u8;
+    let mut rgba_image = base_image.to_rgba8();
+    draw_text_mut(
+        &mut rgba_image,
+        Rgba([255, 255, 255, alpha]),
+        x.max(0) as i32,
+        y.max(0) as i32,
+        scale,
+        &font,
+        &single_line_text,
+    );
+    *base_image = DynamicImage::ImageRgba8(rgba_image);
 
     Ok(())
 }

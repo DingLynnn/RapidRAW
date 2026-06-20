@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import { ExportPreset, WatermarkAnchor } from '../components/ui/ExportImportProperties';
+import { ExportPreset, WatermarkAnchor, WatermarkType } from '../components/ui/ExportImportProperties';
 
 export function useExportSettings() {
   const [fileFormat, setFileFormat] = useState('jpeg');
@@ -15,8 +15,12 @@ export function useExportSettings() {
   const [preserveFolders, setPreserveFolders] = useState(false);
   const [filenameTemplate, setFilenameTemplate] = useState('{original_filename}_edited');
   const [enableWatermark, setEnableWatermark] = useState(false);
+  const [watermarkType, setWatermarkType] = useState<WatermarkType>(WatermarkType.Image);
   const [watermarkPath, setWatermarkPath] = useState<string | null>(null);
-  const [watermarkAnchor, setWatermarkAnchor] = useState<WatermarkAnchor>(WatermarkAnchor.BottomRight);
+  const [watermarkText, setWatermarkText] = useState('Watermark');
+  const [watermarkFontPath, setWatermarkFontPath] = useState<string | null>(null);
+  const [watermarkFontSize, setWatermarkFontSize] = useState(5);
+  const [watermarkAnchor, setWatermarkAnchor] = useState<WatermarkAnchor>(WatermarkAnchor.BottomCenter);
   const [watermarkScale, setWatermarkScale] = useState(10);
   const [watermarkSpacing, setWatermarkSpacing] = useState(5);
   const [watermarkOpacity, setWatermarkOpacity] = useState(75);
@@ -35,8 +39,12 @@ export function useExportSettings() {
     setPreserveFolders(preset.preserveFolders ?? false);
     setFilenameTemplate(preset.filenameTemplate);
     setEnableWatermark(preset.enableWatermark);
+    setWatermarkType(preset.watermarkType ?? WatermarkType.Image);
     setWatermarkPath(preset.watermarkPath);
-    setWatermarkAnchor(preset.watermarkAnchor as WatermarkAnchor);
+    setWatermarkText(preset.watermarkText ?? 'Watermark');
+    setWatermarkFontPath(preset.watermarkFontPath ?? null);
+    setWatermarkFontSize(preset.watermarkFontSize ?? 5);
+    setWatermarkAnchor((preset.watermarkAnchor as WatermarkAnchor) ?? WatermarkAnchor.BottomCenter);
     setWatermarkScale(preset.watermarkScale);
     setWatermarkSpacing(preset.watermarkSpacing);
     setWatermarkOpacity(preset.watermarkOpacity);
@@ -57,7 +65,11 @@ export function useExportSettings() {
       preserveFolders,
       filenameTemplate,
       enableWatermark,
+      watermarkType,
       watermarkPath,
+      watermarkText,
+      watermarkFontPath,
+      watermarkFontSize,
       watermarkAnchor,
       watermarkScale,
       watermarkSpacing,
@@ -77,7 +89,11 @@ export function useExportSettings() {
       preserveFolders,
       filenameTemplate,
       enableWatermark,
+      watermarkType,
       watermarkPath,
+      watermarkText,
+      watermarkFontPath,
+      watermarkFontSize,
       watermarkAnchor,
       watermarkScale,
       watermarkSpacing,
@@ -112,8 +128,16 @@ export function useExportSettings() {
     setFilenameTemplate,
     enableWatermark,
     setEnableWatermark,
+    watermarkType,
+    setWatermarkType,
     watermarkPath,
     setWatermarkPath,
+    watermarkText,
+    setWatermarkText,
+    watermarkFontPath,
+    setWatermarkFontPath,
+    watermarkFontSize,
+    setWatermarkFontSize,
     watermarkAnchor,
     setWatermarkAnchor,
     watermarkScale,

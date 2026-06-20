@@ -61,8 +61,17 @@ export enum WatermarkAnchor {
   BottomRight = 'bottomRight',
 }
 
+export enum WatermarkType {
+  Image = 'image',
+  Text = 'text',
+}
+
 export interface WatermarkSettings {
-  path: string;
+  type?: WatermarkType;
+  path?: string | null;
+  text?: string;
+  fontPath?: string | null;
+  fontSize?: number;
   anchor: WatermarkAnchor;
   scale: number;
   spacing: number;
@@ -113,7 +122,11 @@ export interface ExportPreset {
   preserveFolders?: boolean;
   filenameTemplate: string;
   enableWatermark: boolean;
+  watermarkType?: WatermarkType;
   watermarkPath: string | null;
+  watermarkText?: string;
+  watermarkFontPath?: string | null;
+  watermarkFontSize?: number;
   watermarkAnchor: string;
   watermarkScale: number;
   watermarkSpacing: number;

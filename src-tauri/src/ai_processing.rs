@@ -170,8 +170,48 @@ fn get_models_dir(app_handle: &tauri::AppHandle) -> Result<PathBuf> {
     Ok(models_dir)
 }
 
+fn get_bundled_model_path(app_handle: &tauri::AppHandle, filename: &str) -> Option<PathBuf> {
+    let mut candidates = Vec::new();
+
+    for relative_path in [
+        format!("resources/models/{}", filename),
+        format!("models/{}", filename),
+    ] {
+        if let Ok(path) = app_handle
+            .path()
+            .resolve(relative_path, tauri::path::BaseDirectory::Resource)
+        {
+            candidates.push(path);
+        }
+    }
+
+    if let Ok(exe_path) = std::env::current_exe()
+        && let Some(exe_dir) = exe_path.parent()
+    {
+        candidates.push(exe_dir.join("resources").join("models").join(filename));
+        candidates.push(exe_dir.join("models").join(filename));
+    }
+
+    candidates.push(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("resources")
+            .join("models")
+            .join(filename),
+    );
+
+    candidates.into_iter().find(|path| path.exists())
+}
+
 async fn download_model(url: &str, dest: &Path) -> Result<()> {
     let response = reqwest::get(url).await?;
+    if !response.status().is_success() {
+        return Err(anyhow::anyhow!(
+            "Download failed with status {} for {}",
+            response.status(),
+            url
+        ));
+    }
+
     let mut file = fs::File::create(dest)?;
     let mut content = Cursor::new(response.bytes().await?);
     std::io::copy(&mut content, &mut file)?;
@@ -197,34 +237,81 @@ fn verify_sha256(path: &Path, expected_hash: &str) -> Result<bool> {
     Ok(hex_hash == expected_hash)
 }
 
-async fn download_and_verify_model(
+async fn get_or_download_verified_model_path(
     app_handle: &tauri::AppHandle,
     models_dir: &Path,
     filename: &str,
     url: &str,
     expected_hash: &str,
     model_name: &str,
-) -> Result<()> {
+) -> Result<PathBuf> {
     let dest_path = models_dir.join(filename);
-    let is_valid = verify_sha256(&dest_path, expected_hash)?;
-
-    if !is_valid {
-        if dest_path.exists() {
-            println!("Model {} has incorrect hash. Re-downloading.", model_name);
-            fs::remove_file(&dest_path)?;
-        }
-        let _ = app_handle.emit("ai-model-download-start", model_name);
-        download_model(url, &dest_path).await?;
-        let _ = app_handle.emit("ai-model-download-finish", model_name);
-
-        if !verify_sha256(&dest_path, expected_hash)? {
-            return Err(anyhow::anyhow!(
-                "Failed to verify model {} after download. Hash mismatch.",
-                model_name
-            ));
-        }
+    if verify_sha256(&dest_path, expected_hash)? {
+        return Ok(dest_path);
     }
-    Ok(())
+
+    if dest_path.exists() {
+        println!(
+            "Cached model {} has incorrect hash. Removing and checking bundled resources.",
+            model_name
+        );
+        fs::remove_file(&dest_path)?;
+    }
+
+    if let Some(bundled_path) = get_bundled_model_path(app_handle, filename) {
+        if verify_sha256(&bundled_path, expected_hash)? {
+            println!(
+                "Using bundled model {} from {:?}.",
+                model_name, bundled_path
+            );
+            return Ok(bundled_path);
+        }
+
+        println!(
+            "Bundled model {} has incorrect hash at {:?}. Falling back to download.",
+            model_name, bundled_path
+        );
+    } else {
+        println!("Bundled model {} was not found. Downloading.", model_name);
+    }
+
+    let _ = app_handle.emit("ai-model-download-start", model_name);
+    download_model(url, &dest_path).await?;
+    let _ = app_handle.emit("ai-model-download-finish", model_name);
+
+    if !verify_sha256(&dest_path, expected_hash)? {
+        return Err(anyhow::anyhow!(
+            "Failed to verify model {} after download. Hash mismatch.",
+            model_name
+        ));
+    }
+
+    Ok(dest_path)
+}
+
+async fn get_or_download_unverified_file_path(
+    app_handle: &tauri::AppHandle,
+    dest_path: &Path,
+    filename: &str,
+    url: &str,
+    file_name: &str,
+) -> Result<PathBuf> {
+    if dest_path.exists() {
+        return Ok(dest_path.to_path_buf());
+    }
+
+    if let Some(bundled_path) = get_bundled_model_path(app_handle, filename) {
+        println!(
+            "Using bundled AI asset {} from {:?}.",
+            file_name, bundled_path
+        );
+        return Ok(bundled_path);
+    }
+
+    let _ = app_handle.emit("ai-model-download-start", file_name);
+    download_model(url, dest_path).await?;
+    let _ = app_handle.emit("ai-model-download-finish", file_name);
+    Ok(dest_path.to_path_buf())
 }
 
 pub async fn get_or_init_ai_models(
@@ -254,7 +341,7 @@ pub async fn get_or_init_ai_models(
 
     let models_dir = get_models_dir(app_handle)?;
 
-    download_and_verify_model(
+    let encoder_path = get_or_download_verified_model_path(
         app_handle,
         &models_dir,
         ENCODER_FILENAME,
@@ -263,7 +350,7 @@ pub async fn get_or_init_ai_models(
         "SAM Encoder",
     )
     .await?;
-    download_and_verify_model(
+    let decoder_path = get_or_download_verified_model_path(
         app_handle,
         &models_dir,
         DECODER_FILENAME,
@@ -272,7 +359,7 @@ pub async fn get_or_init_ai_models(
         "SAM Decoder",
     )
     .await?;
-    download_and_verify_model(
+    let u2netp_path = get_or_download_verified_model_path(
         app_handle,
         &models_dir,
         U2NETP_FILENAME,
@@ -281,7 +368,7 @@ pub async fn get_or_init_ai_models(
         "Foreground Model",
     )
     .await?;
-    download_and_verify_model(
+    let sky_seg_path = get_or_download_verified_model_path(
         app_handle,
         &models_dir,
         SKYSEG_FILENAME,
@@ -290,7 +377,7 @@ pub async fn get_or_init_ai_models(
         "Sky Model",
     )
     .await?;
-    download_and_verify_model(
+    let depth_path = get_or_download_verified_model_path(
         app_handle,
         &models_dir,
         DEPTH_FILENAME,
@@ -301,12 +388,6 @@ pub async fn get_or_init_ai_models(
     .await?;
 
     let _ = ort::init().with_name("AI").commit();
-
-    let encoder_path = models_dir.join(ENCODER_FILENAME);
-    let decoder_path = models_dir.join(DECODER_FILENAME);
-    let u2netp_path = models_dir.join(U2NETP_FILENAME);
-    let sky_seg_path = models_dir.join(SKYSEG_FILENAME);
-    let depth_path = models_dir.join(DEPTH_FILENAME);
 
     let sam_encoder = Session::builder()?.commit_from_file(encoder_path)?;
     let sam_decoder = Session::builder()?.commit_from_file(decoder_path)?;
@@ -367,7 +448,7 @@ pub async fn get_or_init_denoise_model(
     }
 
     let models_dir = get_models_dir(app_handle)?;
-    download_and_verify_model(
+    let model_path = get_or_download_verified_model_path(
         app_handle,
         &models_dir,
         DENOISE_FILENAME,
@@ -378,7 +459,6 @@ pub async fn get_or_init_denoise_model(
     .await?;
 
     let _ = ort::init().with_name("AI-Denoise").commit();
-    let model_path = models_dir.join(DENOISE_FILENAME);
     let session = Session::builder()?.commit_from_file(model_path)?;
     let denoise_model = Arc::new(Mutex::new(session));
 
@@ -428,7 +508,7 @@ pub async fn get_or_init_clip_models(
 
     let models_dir = get_models_dir(app_handle)?;
 
-    download_and_verify_model(
+    let clip_model_path = get_or_download_verified_model_path(
         app_handle,
         &models_dir,
         CLIP_MODEL_FILENAME,
@@ -438,15 +518,17 @@ pub async fn get_or_init_clip_models(
     )
     .await?;
 
-    let clip_tokenizer_path = models_dir.join(CLIP_TOKENIZER_FILENAME);
-    if !clip_tokenizer_path.exists() {
-        let _ = app_handle.emit("ai-model-download-start", "CLIP Tokenizer");
-        download_model(CLIP_TOKENIZER_URL, &clip_tokenizer_path).await?;
-        let _ = app_handle.emit("ai-model-download-finish", "CLIP Tokenizer");
-    }
+    let clip_tokenizer_dest_path = models_dir.join(CLIP_TOKENIZER_FILENAME);
+    let clip_tokenizer_path = get_or_download_unverified_file_path(
+        app_handle,
+        &clip_tokenizer_dest_path,
+        CLIP_TOKENIZER_FILENAME,
+        CLIP_TOKENIZER_URL,
+        "CLIP Tokenizer",
+    )
+    .await?;
 
     let _ = ort::init().with_name("AI-Tagging").commit();
-    let clip_model_path = models_dir.join(CLIP_MODEL_FILENAME);
     let model = Mutex::new(Session::builder()?.commit_from_file(clip_model_path)?);
     let tokenizer =
         Tokenizer::from_file(clip_tokenizer_path).map_err(|e| anyhow::anyhow!(e.to_string()))?;
@@ -498,7 +580,7 @@ pub async fn get_or_init_lama_model(
     }
 
     let models_dir = get_models_dir(app_handle)?;
-    download_and_verify_model(
+    let model_path = get_or_download_verified_model_path(
         app_handle,
         &models_dir,
         LAMA_FILENAME,
@@ -509,7 +591,6 @@ pub async fn get_or_init_lama_model(
     .await?;
 
     let _ = ort::init().with_name("AI-Inpainting").commit();
-    let model_path = models_dir.join(LAMA_FILENAME);
     let session = Session::builder()?.commit_from_file(model_path)?;
     let lama_model = Arc::new(Mutex::new(session));
 
