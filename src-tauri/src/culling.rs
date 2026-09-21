@@ -27,6 +27,8 @@ pub struct ImageAnalysisResult {
     pub sharpness_metric: f64,
     pub center_focus_metric: f64,
     pub exposure_metric: f64,
+    pub score_reasons: Vec<String>,
+    pub suggested_action: String,
     pub width: u32,
     pub height: u32,
 }
@@ -157,6 +159,34 @@ fn analyze_image(
         + (normalized_center_focus * WEIGHT_CENTER_FOCUS)
         + (exposure_metric * WEIGHT_EXPOSURE);
 
+    let mut score_reasons = Vec::new();
+    if normalized_sharpness >= 0.72 {
+        score_reasons.push("sharp detail".to_string());
+    } else if normalized_sharpness < 0.42 {
+        score_reasons.push("soft detail".to_string());
+    }
+    if normalized_center_focus >= 0.70 {
+        score_reasons.push("strong center focus".to_string());
+    } else if normalized_center_focus < 0.40 {
+        score_reasons.push("weak center focus".to_string());
+    }
+    if exposure_metric >= 0.82 {
+        score_reasons.push("balanced exposure".to_string());
+    } else if exposure_metric < 0.55 {
+        score_reasons.push("possible clipped exposure".to_string());
+    }
+    if score_reasons.is_empty() {
+        score_reasons.push("average technical quality".to_string());
+    }
+
+    let suggested_action = if quality_score >= 0.70 {
+        "keep"
+    } else if quality_score >= 0.48 {
+        "review"
+    } else {
+        "reject"
+    };
+
     let hash = hasher.hash_image(&thumbnail);
 
     Ok(ImageAnalysisData {
@@ -167,6 +197,8 @@ fn analyze_image(
             sharpness_metric,
             center_focus_metric,
             exposure_metric,
+            score_reasons,
+            suggested_action: suggested_action.to_string(),
             width,
             height,
         },

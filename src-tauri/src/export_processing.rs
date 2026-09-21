@@ -110,6 +110,14 @@ pub struct WatermarkSettings {
     pub font_path: Option<String>,
     #[serde(default = "default_watermark_font_size")]
     pub font_size: f32,
+    #[serde(default)]
+    pub font_bold: bool,
+    #[serde(default = "default_watermark_font_bold_strength")]
+    pub font_bold_strength: f32,
+    #[serde(default)]
+    pub font_italic: bool,
+    #[serde(default)]
+    pub font_underline: bool,
     pub anchor: WatermarkAnchor,
     pub scale: f32,
     pub spacing: f32,
@@ -118,6 +126,10 @@ pub struct WatermarkSettings {
 
 fn default_watermark_font_size() -> f32 {
     5.0
+}
+
+fn default_watermark_font_bold_strength() -> f32 {
+    3.0
 }
 
 fn calculate_watermark_position(
@@ -264,28 +276,80 @@ fn apply_text_watermark(
         return Ok(());
     }
 
+    let italic_offset = if watermark_settings.font_italic {
+        ((text_h as f32) * 0.25).ceil() as u32
+    } else {
+        0
+    };
+    // `draw_text_mut` has no font-weight option. Re-drawing the glyph with a
+    // one-pixel offset is imperceptible on full-resolution exports, so expand
+    // the stroke proportionally to the selected font size instead.
+    let bold_stroke = if watermark_settings.font_bold {
+        (font_px * (watermark_settings.font_bold_strength.clamp(1.0, 10.0) / 100.0))
+            .ceil()
+            .max(1.0) as u32
+    } else {
+        0
+    };
+    let watermark_width = text_w + italic_offset + bold_stroke;
+    let watermark_height =
+        text_h + u32::from(watermark_settings.font_underline) * (font_px / 12.0).ceil() as u32;
     let spacing_pixels = (base_min_dim * (watermark_settings.spacing / 100.0)) as i64;
     let (x, y) = calculate_watermark_position(
         base_w,
         base_h,
-        text_w,
-        text_h,
+        watermark_width,
+        watermark_height,
         spacing_pixels,
         &watermark_settings.anchor,
     );
 
     let opacity = (watermark_settings.opacity / 100.0).clamp(0.0, 1.0);
     let alpha = (opacity * 255.0).round() as u8;
-    let mut rgba_image = base_image.to_rgba8();
+    let mut text_image =
+        ImageBuffer::from_pixel(watermark_width, watermark_height, Rgba([0, 0, 0, 0]));
     draw_text_mut(
-        &mut rgba_image,
+        &mut text_image,
         Rgba([255, 255, 255, alpha]),
-        x.max(0) as i32,
-        y.max(0) as i32,
+        0,
+        0,
         scale,
         &font,
         &single_line_text,
     );
+    for offset in 1..=bold_stroke {
+        draw_text_mut(
+            &mut text_image,
+            Rgba([255, 255, 255, alpha]),
+            offset as i32,
+            0,
+            scale,
+            &font,
+            &single_line_text,
+        );
+    }
+    if watermark_settings.font_italic && text_h > 1 {
+        let mut italic_image =
+            ImageBuffer::from_pixel(watermark_width, watermark_height, Rgba([0, 0, 0, 0]));
+        for source_y in 0..text_h {
+            let shift = ((text_h - 1 - source_y) * italic_offset) / (text_h - 1);
+            for source_x in 0..watermark_width.saturating_sub(shift) {
+                let pixel = *text_image.get_pixel(source_x, source_y);
+                if pixel[3] > 0 {
+                    italic_image.put_pixel(source_x + shift, source_y, pixel);
+                }
+            }
+        }
+        text_image = italic_image;
+    }
+    if watermark_settings.font_underline {
+        let underline_y = text_h.min(watermark_height.saturating_sub(1));
+        for underline_x in 0..watermark_width {
+            text_image.put_pixel(underline_x, underline_y, Rgba([255, 255, 255, alpha]));
+        }
+    }
+    let mut rgba_image = base_image.to_rgba8();
+    image::imageops::overlay(&mut rgba_image, &text_image, x, y);
     *base_image = DynamicImage::ImageRgba8(rgba_image);
 
     Ok(())

@@ -20,6 +20,10 @@ export function useExportSettings() {
   const [watermarkText, setWatermarkText] = useState('Watermark');
   const [watermarkFontPath, setWatermarkFontPath] = useState<string | null>(null);
   const [watermarkFontSize, setWatermarkFontSize] = useState(5);
+  const [watermarkFontBold, setWatermarkFontBold] = useState(false);
+  const [watermarkFontBoldStrength, setWatermarkFontBoldStrength] = useState(3);
+  const [watermarkFontItalic, setWatermarkFontItalic] = useState(false);
+  const [watermarkFontUnderline, setWatermarkFontUnderline] = useState(false);
   const [watermarkAnchor, setWatermarkAnchor] = useState<WatermarkAnchor>(WatermarkAnchor.BottomCenter);
   const [watermarkScale, setWatermarkScale] = useState(10);
   const [watermarkSpacing, setWatermarkSpacing] = useState(5);
@@ -44,6 +48,10 @@ export function useExportSettings() {
     setWatermarkText(preset.watermarkText ?? 'Watermark');
     setWatermarkFontPath(preset.watermarkFontPath ?? null);
     setWatermarkFontSize(preset.watermarkFontSize ?? 5);
+    setWatermarkFontBold(preset.watermarkFontBold ?? false);
+    setWatermarkFontBoldStrength(preset.watermarkFontBoldStrength ?? 3);
+    setWatermarkFontItalic(preset.watermarkFontItalic ?? false);
+    setWatermarkFontUnderline(preset.watermarkFontUnderline ?? false);
     setWatermarkAnchor((preset.watermarkAnchor as WatermarkAnchor) ?? WatermarkAnchor.BottomCenter);
     setWatermarkScale(preset.watermarkScale);
     setWatermarkSpacing(preset.watermarkSpacing);
@@ -70,6 +78,10 @@ export function useExportSettings() {
       watermarkText,
       watermarkFontPath,
       watermarkFontSize,
+      watermarkFontBold,
+      watermarkFontBoldStrength,
+      watermarkFontItalic,
+      watermarkFontUnderline,
       watermarkAnchor,
       watermarkScale,
       watermarkSpacing,
@@ -94,6 +106,10 @@ export function useExportSettings() {
       watermarkText,
       watermarkFontPath,
       watermarkFontSize,
+      watermarkFontBold,
+      watermarkFontBoldStrength,
+      watermarkFontItalic,
+      watermarkFontUnderline,
       watermarkAnchor,
       watermarkScale,
       watermarkSpacing,
@@ -138,6 +154,14 @@ export function useExportSettings() {
     setWatermarkFontPath,
     watermarkFontSize,
     setWatermarkFontSize,
+    watermarkFontBold,
+    setWatermarkFontBold,
+    watermarkFontBoldStrength,
+    setWatermarkFontBoldStrength,
+    watermarkFontItalic,
+    setWatermarkFontItalic,
+    watermarkFontUnderline,
+    setWatermarkFontUnderline,
     watermarkAnchor,
     setWatermarkAnchor,
     watermarkScale,

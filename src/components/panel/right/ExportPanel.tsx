@@ -131,6 +131,14 @@ export default function ExportPanel({
     setWatermarkFontPath,
     watermarkFontSize,
     setWatermarkFontSize,
+    watermarkFontBold,
+    setWatermarkFontBold,
+    watermarkFontBoldStrength,
+    setWatermarkFontBoldStrength,
+    watermarkFontItalic,
+    setWatermarkFontItalic,
+    watermarkFontUnderline,
+    setWatermarkFontUnderline,
     watermarkAnchor,
     setWatermarkAnchor,
     watermarkScale,
@@ -262,6 +270,10 @@ export default function ExportPanel({
           text: trimmedText,
           fontPath: watermarkFontPath,
           fontSize: watermarkFontSize,
+          fontBold: watermarkFontBold,
+          fontBoldStrength: watermarkFontBoldStrength,
+          fontItalic: watermarkFontItalic,
+          fontUnderline: watermarkFontUnderline,
           anchor: watermarkAnchor,
           scale: watermarkScale,
           spacing: watermarkSpacing,
@@ -275,6 +287,10 @@ export default function ExportPanel({
     watermarkText,
     watermarkFontPath,
     watermarkFontSize,
+    watermarkFontBold,
+    watermarkFontBoldStrength,
+    watermarkFontItalic,
+    watermarkFontUnderline,
     watermarkAnchor,
     watermarkScale,
     watermarkSpacing,
@@ -640,6 +656,14 @@ export default function ExportPanel({
                       setFontPath={setWatermarkFontPath}
                       fontSize={watermarkFontSize}
                       setFontSize={setWatermarkFontSize}
+                      fontBold={watermarkFontBold}
+                      setFontBold={setWatermarkFontBold}
+                      fontBoldStrength={watermarkFontBoldStrength}
+                      setFontBoldStrength={setWatermarkFontBoldStrength}
+                      fontItalic={watermarkFontItalic}
+                      setFontItalic={setWatermarkFontItalic}
+                      fontUnderline={watermarkFontUnderline}
+                      setFontUnderline={setWatermarkFontUnderline}
                       anchor={watermarkAnchor}
                       setAnchor={setWatermarkAnchor}
                       scale={watermarkScale}

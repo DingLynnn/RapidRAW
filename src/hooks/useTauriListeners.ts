@@ -114,62 +114,141 @@ export function useTauriListeners({
         }
       }),
       listen('ai-model-download-start', (event: any) => {
-        if (isEffectActive) useProcessStore.getState().setProcess({ aiModelDownloadStatus: event.payload });
+        if (isEffectActive) {
+          const modelName = String(event.payload || 'AI model');
+          useProcessStore.getState().setProcess({ aiModelDownloadStatus: modelName });
+          useProcessStore.getState().upsertActivityTask({
+            id: `ai-model:${modelName}`,
+            kind: 'ai',
+            title: 'Downloading AI model',
+            detail: modelName,
+            status: 'running',
+          });
+        }
       }),
-      listen('ai-model-download-finish', () => {
-        if (isEffectActive) useProcessStore.getState().setProcess({ aiModelDownloadStatus: null });
+      listen('ai-model-download-finish', (event: any) => {
+        if (isEffectActive) {
+          const modelName = String(event.payload || useProcessStore.getState().aiModelDownloadStatus || 'AI model');
+          useProcessStore.getState().setProcess({ aiModelDownloadStatus: null });
+          useProcessStore.getState().completeActivityTask(`ai-model:${modelName}`, 'success', modelName);
+        }
       }),
       listen('indexing-started', () => {
-        if (isEffectActive)
+        if (isEffectActive) {
           useProcessStore.getState().setProcess({ isIndexing: true, indexingProgress: { current: 0, total: 0 } });
+          useProcessStore.getState().upsertActivityTask({
+            id: 'library-indexing',
+            kind: 'indexing',
+            title: 'Indexing library',
+            detail: 'Preparing AI tags and metadata',
+            status: 'running',
+          });
+        }
       }),
       listen('indexing-progress', (event: any) => {
-        if (isEffectActive) useProcessStore.getState().setProcess({ indexingProgress: event.payload });
+        if (isEffectActive) {
+          useProcessStore.getState().setProcess({ indexingProgress: event.payload });
+          useProcessStore.getState().upsertActivityTask({
+            id: 'library-indexing',
+            kind: 'indexing',
+            title: 'Indexing library',
+            current: event.payload?.current,
+            total: event.payload?.total,
+            status: 'running',
+          });
+        }
       }),
       listen('indexing-finished', () => {
         if (isEffectActive) {
           useProcessStore.getState().setProcess({ isIndexing: false, indexingProgress: { current: 0, total: 0 } });
+          useProcessStore.getState().completeActivityTask('library-indexing', 'success', 'Indexing complete');
           const currentPath = useLibraryStore.getState().currentFolderPath;
           if (currentPath) {
             refs.current.refreshImageList();
           }
         }
       }),
+      listen('indexing-error', (event: any) => {
+        if (isEffectActive) {
+          useProcessStore.getState().setProcess({ isIndexing: false, indexingProgress: { current: 0, total: 0 } });
+          useProcessStore.getState().completeActivityTask('library-indexing', 'error', String(event.payload));
+        }
+      }),
       listen('batch-export-progress', (event: any) => {
-        if (isEffectActive) useProcessStore.getState().setExportState({ progress: event.payload });
+        if (isEffectActive) {
+          useProcessStore.getState().setExportState({ progress: event.payload });
+          useProcessStore.getState().upsertActivityTask({
+            id: 'batch-export',
+            kind: 'export',
+            title: 'Exporting images',
+            current: event.payload?.current,
+            total: event.payload?.total,
+            status: 'running',
+          });
+        }
       }),
       listen('export-complete', () => {
-        if (isEffectActive) useProcessStore.getState().setExportState({ status: Status.Success });
+        if (isEffectActive) {
+          useProcessStore.getState().setExportState({ status: Status.Success });
+          useProcessStore.getState().completeActivityTask('batch-export', 'success', 'Export complete');
+        }
       }),
       listen('export-error', (event: any) => {
-        if (isEffectActive)
+        if (isEffectActive) {
           useProcessStore.getState().setExportState({
             status: Status.Error,
             errorMessage: typeof event.payload === 'string' ? event.payload : 'Unknown error',
           });
+          useProcessStore
+            .getState()
+            .completeActivityTask('batch-export', 'error', typeof event.payload === 'string' ? event.payload : 'Export failed');
+        }
       }),
       listen('export-cancelled', () => {
-        if (isEffectActive) useProcessStore.getState().setExportState({ status: Status.Cancelled });
+        if (isEffectActive) {
+          useProcessStore.getState().setExportState({ status: Status.Cancelled });
+          useProcessStore.getState().completeActivityTask('batch-export', 'cancelled', 'Export cancelled');
+        }
       }),
       listen('import-start', (event: any) => {
-        if (isEffectActive)
+        if (isEffectActive) {
           useProcessStore.getState().setImportState({
             errorMessage: '',
             path: '',
             progress: { current: 0, total: event.payload.total },
             status: Status.Importing,
           });
+          useProcessStore.getState().upsertActivityTask({
+            id: 'import-files',
+            kind: 'import',
+            title: 'Importing files',
+            current: 0,
+            total: event.payload?.total,
+            status: 'running',
+          });
+        }
       }),
       listen('import-progress', (event: any) => {
-        if (isEffectActive)
+        if (isEffectActive) {
           useProcessStore.getState().setImportState({
             path: event.payload.path,
             progress: { current: event.payload.current, total: event.payload.total },
           });
+          useProcessStore.getState().upsertActivityTask({
+            id: 'import-files',
+            kind: 'import',
+            title: 'Importing files',
+            detail: event.payload?.path,
+            current: event.payload?.current,
+            total: event.payload?.total,
+            status: 'running',
+          });
+        }
       }),
       listen('import-complete', () => {
         if (isEffectActive) {
           useProcessStore.getState().setImportState({ status: Status.Success });
+          useProcessStore.getState().completeActivityTask('import-files', 'success', 'Import complete');
           refs.current.refreshAllFolderTrees();
           const currentPath = useLibraryStore.getState().currentFolderPath;
           if (currentPath) {
@@ -178,17 +257,29 @@ export function useTauriListeners({
         }
       }),
       listen('import-error', (event: any) => {
-        if (isEffectActive)
+        if (isEffectActive) {
           useProcessStore.getState().setImportState({
             status: Status.Error,
             errorMessage: typeof event.payload === 'string' ? event.payload : 'Unknown error',
           });
+          useProcessStore
+            .getState()
+            .completeActivityTask('import-files', 'error', typeof event.payload === 'string' ? event.payload : 'Import failed');
+        }
       }),
       listen('denoise-progress', (event: any) => {
-        if (isEffectActive)
+        if (isEffectActive) {
           useUIStore.getState().setUI((state) => ({
             denoiseModalState: { ...state.denoiseModalState, progressMessage: event.payload as string },
           }));
+          useProcessStore.getState().upsertActivityTask({
+            id: 'denoise',
+            kind: 'denoise',
+            title: 'Denoising image',
+            detail: String(event.payload || ''),
+            status: 'running',
+          });
+        }
       }),
       listen('denoise-complete', (event: any) => {
         if (isEffectActive) {
@@ -203,6 +294,7 @@ export function useTauriListeners({
               progressMessage: null,
             },
           }));
+          useProcessStore.getState().completeActivityTask('denoise', 'success', 'Denoise complete');
         }
       }),
       listen('denoise-error', (event: any) => {
@@ -215,6 +307,7 @@ export function useTauriListeners({
               progressMessage: null,
             },
           }));
+          useProcessStore.getState().completeActivityTask('denoise', 'error', String(event.payload));
         }
       }),
       listen('wgpu-frame-ready', (event: any) => {
@@ -306,6 +399,14 @@ export function useTauriListeners({
               error: null,
             },
           }));
+          useProcessStore.getState().upsertActivityTask({
+            id: 'culling',
+            kind: 'culling',
+            title: 'Analyzing cull candidates',
+            current: 0,
+            total: Number(event.payload || 0),
+            status: 'running',
+          });
         }
       }),
       listen('culling-progress', (event: any) => {
@@ -313,6 +414,15 @@ export function useTauriListeners({
           useUIStore
             .getState()
             .setUI((state) => ({ cullingModalState: { ...state.cullingModalState, progress: event.payload } }));
+          useProcessStore.getState().upsertActivityTask({
+            id: 'culling',
+            kind: 'culling',
+            title: 'Analyzing cull candidates',
+            detail: event.payload?.stage,
+            current: event.payload?.current,
+            total: event.payload?.total,
+            status: 'running',
+          });
         }
       }),
       listen('culling-complete', (event: any) => {
@@ -320,6 +430,12 @@ export function useTauriListeners({
           useUIStore.getState().setUI((state) => ({
             cullingModalState: { ...state.cullingModalState, progress: null, suggestions: event.payload },
           }));
+          const similarCount =
+            event.payload?.similarGroups?.reduce((count: number, group: any) => count + group.duplicates.length, 0) || 0;
+          const blurryCount = event.payload?.blurryImages?.length || 0;
+          useProcessStore
+            .getState()
+            .completeActivityTask('culling', 'success', `Found ${similarCount + blurryCount} review candidates`);
         }
       }),
       listen('culling-error', (event: any) => {
@@ -327,6 +443,7 @@ export function useTauriListeners({
           useUIStore.getState().setUI((state) => ({
             cullingModalState: { ...state.cullingModalState, progress: null, error: String(event.payload) },
           }));
+          useProcessStore.getState().completeActivityTask('culling', 'error', String(event.payload));
         }
       }),
     ];

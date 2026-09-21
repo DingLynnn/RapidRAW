@@ -72,6 +72,10 @@ export interface WatermarkSettings {
   text?: string;
   fontPath?: string | null;
   fontSize?: number;
+  fontBold?: boolean;
+  fontBoldStrength?: number;
+  fontItalic?: boolean;
+  fontUnderline?: boolean;
   anchor: WatermarkAnchor;
   scale: number;
   spacing: number;
@@ -127,6 +131,10 @@ export interface ExportPreset {
   watermarkText?: string;
   watermarkFontPath?: string | null;
   watermarkFontSize?: number;
+  watermarkFontBold?: boolean;
+  watermarkFontBoldStrength?: number;
+  watermarkFontItalic?: boolean;
+  watermarkFontUnderline?: boolean;
   watermarkAnchor: string;
   watermarkScale: number;
   watermarkSpacing: number;

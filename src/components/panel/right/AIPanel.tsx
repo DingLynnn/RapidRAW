@@ -16,6 +16,7 @@ import {
 } from '@dnd-kit/core';
 import {
   Circle,
+  Cloud,
   ClipboardPaste,
   Copy,
   Eye,
@@ -31,6 +32,7 @@ import {
   Send,
   FolderOpen,
   SquaresIntersect,
+  User,
 } from 'lucide-react';
 
 import CollapsibleSection from '../../ui/CollapsibleSection';
@@ -291,7 +293,12 @@ export default function AIPanel() {
   const setCustomEscapeHandler = useUIStore((s) => s.setCustomEscapeHandler);
 
   const { setAdjustments } = useEditorActions();
-  const { handleGenerativeReplace, handleDeleteAiPatch, handleGenerateAiForegroundMask } = useAiMasking();
+  const {
+    handleGenerativeReplace,
+    handleDeleteAiPatch,
+    handleGenerateAiForegroundMask,
+    handleCreateSmartAiAdjustment,
+  } = useAiMasking();
   const appSettings = useSettingsStore((s) => s.appSettings);
   const aiProvider = appSettings?.aiProvider || 'cpu';
 
@@ -302,6 +309,37 @@ export default function AIPanel() {
 
   const isGenerativeAvailable =
     (aiProvider === 'cloud' && !!isSignedIn && !!isPro) || (aiProvider === 'ai-connector' && isAIConnectorConnected);
+
+  const smartAdjustmentRecipes = useMemo(
+    () => [
+      {
+        id: 'sky-detail',
+        name: t('editor.ai.smartAdjustments.skyDetail', 'Sky detail'),
+        description: t('editor.ai.smartAdjustments.skyDetailDesc', 'Recover highlights and add crisp sky contrast.'),
+        icon: Cloud,
+        maskType: Mask.AiSky,
+        adjustments: { dehaze: 18, highlights: -28, saturation: 8, clarity: 10, temperature: -4 },
+      },
+      {
+        id: 'subject-lift',
+        name: t('editor.ai.smartAdjustments.subjectLift', 'Subject lift'),
+        description: t('editor.ai.smartAdjustments.subjectLiftDesc', 'Brighten the main foreground without touching the background.'),
+        icon: User,
+        maskType: Mask.AiForeground,
+        adjustments: { exposure: 0.28, shadows: 18, brightness: 5, clarity: 4, vibrance: 5 },
+      },
+      {
+        id: 'depth-soften',
+        name: t('editor.ai.smartAdjustments.depthSoften', 'Depth soften'),
+        description: t('editor.ai.smartAdjustments.depthSoftenDesc', 'Use depth to soften distant background detail.'),
+        icon: SquaresIntersect,
+        maskType: Mask.AiDepth,
+        depthParameters: { minDepth: 48, maxDepth: 100, minFade: 18, maxFade: 18, feather: 20 },
+        adjustments: { clarity: -18, dehaze: -8, saturation: -5, lumaNoiseReduction: 12 },
+      },
+    ],
+    [t],
+  );
 
   useEffect(() => {
     if (aiProvider !== 'cloud' || !isSignedIn || !isPro) return;
@@ -920,6 +958,43 @@ export default function AIPanel() {
     }
   };
 
+  const renderSmartAdjustmentButtons = () => {
+    if (!selectedImage) return null;
+
+    return (
+      <div className="mt-6" onClick={(e) => e.stopPropagation()}>
+        <Text variant={TextVariants.heading} className="mb-2">
+          {t('editor.ai.smartAdjustments.title', 'Smart local adjustments')}
+        </Text>
+        <div className="grid grid-cols-1 gap-2">
+          {smartAdjustmentRecipes.map((recipe) => {
+            const Icon = recipe.icon;
+            return (
+              <button
+                key={recipe.id}
+                className="flex items-center gap-3 p-3 rounded-md bg-surface hover:bg-card-active transition-colors text-left disabled:opacity-60 disabled:cursor-wait"
+                disabled={isGeneratingAiMask}
+                onClick={() => handleCreateSmartAiAdjustment(recipe)}
+              >
+                <div className="w-8 h-8 rounded-md bg-bg-primary flex items-center justify-center text-accent shrink-0">
+                  {isGeneratingAiMask ? <Loader2 size={16} className="animate-spin" /> : <Icon size={16} />}
+                </div>
+                <div className="min-w-0">
+                  <Text variant={TextVariants.label} color={TextColors.primary} weight={TextWeights.semibold}>
+                    {recipe.name}
+                  </Text>
+                  <Text variant={TextVariants.small} className="truncate">
+                    {recipe.description}
+                  </Text>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <DndContext
       sensors={sensors}
@@ -969,6 +1044,7 @@ export default function AIPanel() {
                       isPro={!!isPro}
                       cloudUsage={cloudUsage}
                     />
+                    {renderSmartAdjustmentButtons()}
                     <Text variant={TextVariants.heading} className="mb-2 mt-8">
                       {t('editor.ai.createNewTitle')}
                     </Text>
@@ -999,6 +1075,7 @@ export default function AIPanel() {
                 <Text variant={TextVariants.heading} className="mb-2">
                   {t('editor.ai.editsTitle')}
                 </Text>
+                {renderSmartAdjustmentButtons()}
 
                 <AnimatePresence
                   initial={false}

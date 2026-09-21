@@ -2,9 +2,23 @@ import { create } from 'zustand';
 import { Progress } from '../components/ui/AppProperties';
 import { ExportState, ImportState, Status } from '../components/ui/ExportImportProperties';
 
+export type ActivityTaskStatus = 'running' | 'success' | 'error' | 'cancelled';
+
+export interface ActivityTask {
+  current?: number;
+  detail?: string;
+  id: string;
+  kind: 'ai' | 'culling' | 'denoise' | 'export' | 'import' | 'indexing' | 'thumbnail' | 'other';
+  status: ActivityTaskStatus;
+  title: string;
+  total?: number;
+  updatedAt: number;
+}
+
 interface ProcessState {
   exportState: ExportState;
   importState: ImportState;
+  activityTasks: Record<string, ActivityTask>;
   isIndexing: boolean;
   indexingProgress: Progress;
   thumbnails: Record<string, string>;
@@ -18,6 +32,14 @@ interface ProcessState {
   setProcess: (state: Partial<ProcessState> | ((state: ProcessState) => Partial<ProcessState>)) => void;
   setExportState: (updater: Partial<ExportState> | ((state: ExportState) => Partial<ExportState>)) => void;
   setImportState: (updater: Partial<ImportState> | ((state: ImportState) => Partial<ImportState>)) => void;
+  upsertActivityTask: (task: Omit<ActivityTask, 'updatedAt'> & { updatedAt?: number }) => void;
+  completeActivityTask: (
+    id: string,
+    status?: Exclude<ActivityTaskStatus, 'running'>,
+    detail?: string,
+  ) => void;
+  dismissActivityTask: (id: string) => void;
+  clearFinishedActivityTasks: () => void;
 }
 
 let exportTimeout: ReturnType<typeof setTimeout>;
@@ -28,6 +50,7 @@ let pasteTimeout: ReturnType<typeof setTimeout>;
 export const useProcessStore = create<ProcessState>((set, get) => ({
   exportState: { errorMessage: '', progress: { current: 0, total: 0 }, status: Status.Idle },
   importState: { errorMessage: '', path: '', progress: { current: 0, total: 0 }, status: Status.Idle },
+  activityTasks: {},
   isIndexing: false,
   indexingProgress: { current: 0, total: 0 },
   thumbnails: {},
@@ -100,4 +123,46 @@ export const useProcessStore = create<ProcessState>((set, get) => ({
       }, 5000);
     }
   },
+
+  upsertActivityTask: (task) =>
+    set((state) => ({
+      activityTasks: {
+        ...state.activityTasks,
+        [task.id]: {
+          ...(state.activityTasks[task.id] || {}),
+          ...task,
+          updatedAt: task.updatedAt ?? Date.now(),
+        },
+      },
+    })),
+
+  completeActivityTask: (id, status = 'success', detail) =>
+    set((state) => {
+      const existing = state.activityTasks[id];
+      if (!existing) return state;
+      return {
+        activityTasks: {
+          ...state.activityTasks,
+          [id]: {
+            ...existing,
+            detail: detail ?? existing.detail,
+            status,
+            updatedAt: Date.now(),
+          },
+        },
+      };
+    }),
+
+  dismissActivityTask: (id) =>
+    set((state) => {
+      const { [id]: _dismissed, ...rest } = state.activityTasks;
+      return { activityTasks: rest };
+    }),
+
+  clearFinishedActivityTasks: () =>
+    set((state) => ({
+      activityTasks: Object.fromEntries(
+        Object.entries(state.activityTasks).filter(([, task]) => task.status === 'running'),
+      ),
+    })),
 }));

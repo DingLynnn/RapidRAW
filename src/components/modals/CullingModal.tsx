@@ -59,6 +59,16 @@ function ImageThumbnail({ path, thumbnails, isSelected, onToggle, children }: an
   );
 }
 
+const CullingInsight = ({ item, scoreLabel }: any) => {
+  const primaryReason = item.scoreReasons?.[0];
+  return (
+    <>
+      <span>{scoreLabel}</span>
+      {primaryReason && <span className="block truncate opacity-80">{primaryReason}</span>}
+    </>
+  );
+};
+
 export default function CullingModal({
   isOpen,
   onClose,
@@ -352,7 +362,12 @@ export default function CullingModal({
                               color={TextColors.white}
                               className="absolute bottom-0 left-0 right-0 p-1 bg-black/60"
                             >
-                              {t('modals.culling.score', { score: group.representative.qualityScore.toFixed(2) })}
+                              <CullingInsight
+                                item={group.representative}
+                                scoreLabel={t('modals.culling.score', {
+                                  score: group.representative.qualityScore.toFixed(2),
+                                })}
+                              />
                             </Text>
                           </div>
                         </div>
@@ -369,7 +384,10 @@ export default function CullingModal({
                                 isSelected={selectedRejects.has(dup.path)}
                                 onToggle={() => handleToggleReject(dup.path)}
                               >
-                                {t('modals.culling.score', { score: dup.qualityScore.toFixed(2) })}
+                                <CullingInsight
+                                  item={dup}
+                                  scoreLabel={t('modals.culling.score', { score: dup.qualityScore.toFixed(2) })}
+                                />
                               </ImageThumbnail>
                             ))}
                           </div>
@@ -389,7 +407,10 @@ export default function CullingModal({
                       isSelected={selectedRejects.has(img.path)}
                       onToggle={() => handleToggleReject(img.path)}
                     >
-                      {t('modals.culling.sharpness', { sharpness: img.sharpnessMetric.toFixed(0) })}
+                      <CullingInsight
+                        item={img}
+                        scoreLabel={t('modals.culling.sharpness', { sharpness: img.sharpnessMetric.toFixed(0) })}
+                      />
                     </ImageThumbnail>
                   ))}
                 </div>

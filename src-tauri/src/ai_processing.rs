@@ -94,6 +94,121 @@ pub struct AiState {
     pub depth_map: Option<CachedDepthMap>,
 }
 
+#[derive(Clone, Copy)]
+struct AiModelAssetSpec {
+    id: &'static str,
+    label: &'static str,
+    filename: &'static str,
+    url: &'static str,
+    sha256: Option<&'static str>,
+    category: &'static str,
+    feature: &'static str,
+}
+
+const AI_MODEL_ASSETS: &[AiModelAssetSpec] = &[
+    AiModelAssetSpec {
+        id: "sam-encoder",
+        label: "SAM Encoder",
+        filename: ENCODER_FILENAME,
+        url: ENCODER_URL,
+        sha256: Some(ENCODER_SHA256),
+        category: "Masking",
+        feature: "Subject selection",
+    },
+    AiModelAssetSpec {
+        id: "sam-decoder",
+        label: "SAM Decoder",
+        filename: DECODER_FILENAME,
+        url: DECODER_URL,
+        sha256: Some(DECODER_SHA256),
+        category: "Masking",
+        feature: "Subject selection",
+    },
+    AiModelAssetSpec {
+        id: "foreground",
+        label: "Foreground Model",
+        filename: U2NETP_FILENAME,
+        url: U2NETP_URL,
+        sha256: Some(U2NETP_SHA256),
+        category: "Masking",
+        feature: "Foreground masks",
+    },
+    AiModelAssetSpec {
+        id: "sky",
+        label: "Sky Model",
+        filename: SKYSEG_FILENAME,
+        url: SKYSEG_URL,
+        sha256: Some(SKYSEG_SHA256),
+        category: "Masking",
+        feature: "Sky masks",
+    },
+    AiModelAssetSpec {
+        id: "depth",
+        label: "Depth Model",
+        filename: DEPTH_FILENAME,
+        url: DEPTH_URL,
+        sha256: Some(DEPTH_SHA256),
+        category: "Masking",
+        feature: "Depth masks",
+    },
+    AiModelAssetSpec {
+        id: "clip",
+        label: "CLIP Model",
+        filename: CLIP_MODEL_FILENAME,
+        url: CLIP_MODEL_URL,
+        sha256: Some(CLIP_MODEL_SHA256),
+        category: "Library",
+        feature: "AI tagging and smart search",
+    },
+    AiModelAssetSpec {
+        id: "clip-tokenizer",
+        label: "CLIP Tokenizer",
+        filename: CLIP_TOKENIZER_FILENAME,
+        url: CLIP_TOKENIZER_URL,
+        sha256: None,
+        category: "Library",
+        feature: "AI tagging and smart search",
+    },
+    AiModelAssetSpec {
+        id: "denoise",
+        label: "NIND Denoise Model",
+        filename: DENOISE_FILENAME,
+        url: DENOISE_URL,
+        sha256: Some(DENOISE_SHA256),
+        category: "Enhancement",
+        feature: "AI denoise",
+    },
+    AiModelAssetSpec {
+        id: "lama",
+        label: "Inpainting Model",
+        filename: LAMA_FILENAME,
+        url: LAMA_URL,
+        sha256: Some(LAMA_SHA256),
+        category: "Generative",
+        feature: "Quick erase and inpainting",
+    },
+];
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AiModelAssetInfo {
+    pub id: String,
+    pub label: String,
+    pub file_name: String,
+    pub category: String,
+    pub feature: String,
+    pub status: String,
+    pub source: String,
+    pub size_bytes: u64,
+    pub is_cached: bool,
+    pub is_bundled: bool,
+    pub is_valid: bool,
+}
+
+fn model_asset_size(path: &Path) -> u64 {
+    fs::metadata(path).map(|m| m.len()).unwrap_or(0)
+}
+
 fn edt_1d(f: &mut [f32], v: &mut [usize], z: &mut [f32], d: &mut [f32]) {
     let n = f.len();
     if n == 0 {
@@ -312,6 +427,149 @@ async fn get_or_download_unverified_file_path(
     download_model(url, dest_path).await?;
     let _ = app_handle.emit("ai-model-download-finish", file_name);
     Ok(dest_path.to_path_buf())
+}
+
+fn describe_model_asset(
+    app_handle: &tauri::AppHandle,
+    models_dir: &Path,
+    spec: AiModelAssetSpec,
+) -> Result<AiModelAssetInfo> {
+    let cached_path = models_dir.join(spec.filename);
+    let bundled_path = get_bundled_model_path(app_handle, spec.filename);
+
+    let mut status = "missing";
+    let mut source = "remote";
+    let mut size_bytes = 0;
+    let mut is_cached = false;
+    let mut is_bundled = false;
+    let mut is_valid = false;
+
+    if cached_path.exists() {
+        is_cached = true;
+        size_bytes = model_asset_size(&cached_path);
+        let valid = spec
+            .sha256
+            .map(|hash| verify_sha256(&cached_path, hash))
+            .transpose()?
+            .unwrap_or(true);
+        status = if valid { "ready" } else { "invalid" };
+        source = "cache";
+        is_valid = valid;
+    } else if let Some(path) = bundled_path {
+        is_bundled = true;
+        size_bytes = model_asset_size(&path);
+        let valid = spec
+            .sha256
+            .map(|hash| verify_sha256(&path, hash))
+            .transpose()?
+            .unwrap_or(true);
+        status = if valid { "ready" } else { "invalid" };
+        source = "bundled";
+        is_valid = valid;
+    }
+
+    Ok(AiModelAssetInfo {
+        id: spec.id.to_string(),
+        label: spec.label.to_string(),
+        file_name: spec.filename.to_string(),
+        category: spec.category.to_string(),
+        feature: spec.feature.to_string(),
+        status: status.to_string(),
+        source: source.to_string(),
+        size_bytes,
+        is_cached,
+        is_bundled,
+        is_valid,
+    })
+}
+
+pub fn list_ai_model_assets_for_app(
+    app_handle: &tauri::AppHandle,
+) -> Result<Vec<AiModelAssetInfo>> {
+    let models_dir = get_models_dir(app_handle)?;
+    AI_MODEL_ASSETS
+        .iter()
+        .map(|spec| describe_model_asset(app_handle, &models_dir, *spec))
+        .collect()
+}
+
+#[tauri::command]
+pub fn list_ai_model_assets(app_handle: tauri::AppHandle) -> Result<Vec<AiModelAssetInfo>, String> {
+    list_ai_model_assets_for_app(&app_handle).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn prepare_ai_model_assets(
+    ids: Vec<String>,
+    app_handle: tauri::AppHandle,
+) -> Result<Vec<AiModelAssetInfo>, String> {
+    let models_dir = get_models_dir(&app_handle).map_err(|e| e.to_string())?;
+    let selected_specs: Vec<AiModelAssetSpec> = AI_MODEL_ASSETS
+        .iter()
+        .copied()
+        .filter(|spec| ids.is_empty() || ids.iter().any(|id| id == spec.id))
+        .collect();
+
+    if selected_specs.is_empty() {
+        return Err("No matching AI model assets were found.".to_string());
+    }
+
+    for spec in selected_specs {
+        if let Some(hash) = spec.sha256 {
+            get_or_download_verified_model_path(
+                &app_handle,
+                &models_dir,
+                spec.filename,
+                spec.url,
+                hash,
+                spec.label,
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+        } else {
+            let dest_path = models_dir.join(spec.filename);
+            get_or_download_unverified_file_path(
+                &app_handle,
+                &dest_path,
+                spec.filename,
+                spec.url,
+                spec.label,
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+        }
+    }
+
+    list_ai_model_assets_for_app(&app_handle).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_ai_model_asset(
+    id: String,
+    app_handle: tauri::AppHandle,
+    state: tauri::State<'_, crate::AppState>,
+) -> Result<Vec<AiModelAssetInfo>, String> {
+    let spec = AI_MODEL_ASSETS
+        .iter()
+        .find(|spec| spec.id == id)
+        .ok_or_else(|| format!("Unknown AI model asset: {}", id))?;
+
+    let models_dir = get_models_dir(&app_handle).map_err(|e| e.to_string())?;
+    let cached_path = models_dir.join(spec.filename);
+    if cached_path.exists() {
+        fs::remove_file(&cached_path).map_err(|e| e.to_string())?;
+    }
+
+    if let Some(ai_state) = state.ai_state.lock().unwrap().as_mut() {
+        ai_state.models = None;
+        ai_state.denoise_model = None;
+        ai_state.clip_models = None;
+        ai_state.lama_model = None;
+        ai_state.embeddings = None;
+        ai_state.depth_map = None;
+    }
+
+    list_ai_model_assets_for_app(&app_handle).map_err(|e| e.to_string())
 }
 
 pub async fn get_or_init_ai_models(

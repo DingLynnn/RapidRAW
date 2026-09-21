@@ -1,12 +1,21 @@
 import { useCallback, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'react-toastify';
+import { v4 as uuidv4 } from 'uuid';
 import { useEditorStore } from '../store/useEditorStore';
 import { useEditorActions } from './useEditorActions';
-import { Adjustments, AiPatch, MaskContainer, Coord } from '../utils/adjustments';
-import { SubMask } from '../components/panel/right/Masks';
+import { Adjustments, AiPatch, MaskContainer, Coord, INITIAL_MASK_ADJUSTMENTS } from '../utils/adjustments';
+import { Mask, SubMask } from '../components/panel/right/Masks';
 import { Invokes } from '../components/ui/AppProperties';
 import { useAuth } from '@clerk/react';
+import { createSubMask } from '../utils/maskUtils';
+
+interface SmartAiAdjustmentRecipe {
+  adjustments: Record<string, any>;
+  depthParameters?: Record<string, any>;
+  maskType: Mask;
+  name: string;
+}
 
 const getTransformAdjustments = (adj: Adjustments) => ({
   transformDistortion: adj.transformDistortion,
@@ -355,6 +364,105 @@ export function useAiMasking() {
     }
   };
 
+  const handleCreateSmartAiAdjustment = useCallback(
+    async (recipe: SmartAiAdjustmentRecipe) => {
+      const { selectedImage, adjustments, isGeneratingAiMask } = useEditorStore.getState();
+      if (!selectedImage?.path || isGeneratingAiMask) return;
+
+      setEditor({ isGeneratingAiMask: true });
+
+      try {
+        const transformAdjustments = getTransformAdjustments(adjustments);
+        let generatedParameters: any = {};
+
+        if (recipe.maskType === Mask.AiSky) {
+          generatedParameters = await invoke(Invokes.GenerateAiSkyMask, {
+            jsAdjustments: transformAdjustments,
+            flipHorizontal: adjustments.flipHorizontal,
+            flipVertical: adjustments.flipVertical,
+            orientationSteps: adjustments.orientationSteps,
+            rotation: adjustments.rotation,
+          });
+        } else if (recipe.maskType === Mask.AiForeground) {
+          generatedParameters = await invoke(Invokes.GenerateAiForegroundMask, {
+            jsAdjustments: transformAdjustments,
+            flipHorizontal: adjustments.flipHorizontal,
+            flipVertical: adjustments.flipVertical,
+            orientationSteps: adjustments.orientationSteps,
+            rotation: adjustments.rotation,
+          });
+        } else if (recipe.maskType === Mask.AiDepth) {
+          generatedParameters = await invoke('generate_ai_depth_mask', {
+            jsAdjustments: transformAdjustments,
+            path: selectedImage.path,
+            minDepth: recipe.depthParameters?.minDepth ?? 45,
+            maxDepth: recipe.depthParameters?.maxDepth ?? 100,
+            minFade: recipe.depthParameters?.minFade ?? 18,
+            maxFade: recipe.depthParameters?.maxFade ?? 12,
+            feather: recipe.depthParameters?.feather ?? 18,
+            flipHorizontal: adjustments.flipHorizontal,
+            flipVertical: adjustments.flipVertical,
+            orientationSteps: adjustments.orientationSteps,
+            rotation: adjustments.rotation,
+          });
+        } else {
+          throw new Error('This smart adjustment needs an automatic AI mask.');
+        }
+
+        const imageDimensions = {
+          width: selectedImage.width || 1000,
+          height: selectedImage.height || 1000,
+        };
+        const subMask = createSubMask(recipe.maskType, imageDimensions);
+        const containerId = uuidv4();
+        const subMaskWithData = {
+          ...subMask,
+          parameters: {
+            ...(subMask.parameters || {}),
+            ...generatedParameters,
+          },
+        };
+
+        const baseAdjustments = JSON.parse(JSON.stringify(INITIAL_MASK_ADJUSTMENTS));
+        const nextAdjustments = {
+          ...baseAdjustments,
+          ...recipe.adjustments,
+          sectionVisibility: {
+            ...baseAdjustments.sectionVisibility,
+            basic: true,
+            color: true,
+            details: true,
+            effects: true,
+            ...(recipe.adjustments.sectionVisibility || {}),
+          },
+        };
+
+        setAdjustments((prev: Adjustments) => ({
+          ...prev,
+          masks: [
+            ...(prev.masks || []),
+            {
+              adjustments: nextAdjustments,
+              id: containerId,
+              invert: false,
+              name: recipe.name,
+              opacity: 100,
+              subMasks: [subMaskWithData],
+              visible: true,
+            },
+          ],
+        }));
+        setEditor({ activeMaskContainerId: containerId, activeMaskId: subMaskWithData.id });
+        toast.success(`${recipe.name} added`);
+      } catch (error) {
+        toast.error(`Smart AI adjustment failed: ${error}`);
+      } finally {
+        setEditor({ isGeneratingAiMask: false });
+      }
+    },
+    [setAdjustments, setEditor],
+  );
+
   useEffect(() => {
     const { activeMaskId, activeAiSubMaskId, adjustments, selectedImage } = useEditorStore.getState();
     const activeSubMask =
@@ -385,5 +493,6 @@ export function useAiMasking() {
     handleGenerateAiDepthMask,
     handleGenerateAiForegroundMask,
     handleGenerateAiSkyMask,
+    handleCreateSmartAiAdjustment,
   };
 }

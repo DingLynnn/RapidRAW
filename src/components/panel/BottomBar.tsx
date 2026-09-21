@@ -1,5 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
-import { Star, Copy, ClipboardPaste, ChevronUp, ChevronDown, Check, FileInput, Settings, Filter } from 'lucide-react';
+import {
+  Activity,
+  Star,
+  Copy,
+  ClipboardPaste,
+  ChevronUp,
+  ChevronDown,
+  Check,
+  CheckCircle,
+  FileInput,
+  Loader2,
+  Settings,
+  Filter,
+  X,
+  XCircle,
+} from 'lucide-react';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useShallow } from 'zustand/react/shallow';
@@ -8,8 +23,10 @@ import { useTranslation } from 'react-i18next';
 import Filmstrip from './Filmstrip';
 import { GLOBAL_KEYS, ImageFile, SelectedImage, ThumbnailAspectRatio } from '../ui/AppProperties';
 import Text from '../ui/Text';
+import { TextVariants } from '../../types/typography';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
+import { ActivityTask, useProcessStore } from '../../store/useProcessStore';
 import { COLOR_LABELS } from '../../utils/adjustments';
 
 interface BottomBarProps {
@@ -87,6 +104,137 @@ const StarRating = ({ rating, onRate, disabled }: StarRatingProps) => {
           </button>
         );
       })}
+    </div>
+  );
+};
+
+const formatTaskProgress = (task: ActivityTask) => {
+  if (!task.total || task.total <= 0 || task.current === undefined) return null;
+  return `${Math.min(task.current, task.total)}/${task.total}`;
+};
+
+const TaskStatusIcon = ({ task }: { task: ActivityTask }) => {
+  if (task.status === 'running') return <Loader2 size={15} className="animate-spin text-accent" />;
+  if (task.status === 'error') return <XCircle size={15} className="text-red-500" />;
+  if (task.status === 'cancelled') return <XCircle size={15} className="text-text-secondary" />;
+  return <CheckCircle size={15} className="text-green-500" />;
+};
+
+const TaskActivityCenter = () => {
+  const { t } = useTranslation();
+  const { activityTasks, clearFinishedActivityTasks, dismissActivityTask } = useProcessStore(
+    useShallow((state) => ({
+      activityTasks: state.activityTasks,
+      clearFinishedActivityTasks: state.clearFinishedActivityTasks,
+      dismissActivityTask: state.dismissActivityTask,
+    })),
+  );
+  const [isOpen, setIsOpen] = useState(false);
+  const tasks = Object.values(activityTasks).sort((a, b) => b.updatedAt - a.updatedAt);
+  const runningCount = tasks.filter((task) => task.status === 'running').length;
+  const errorCount = tasks.filter((task) => task.status === 'error').length;
+
+  if (tasks.length === 0) return null;
+
+  const latestTask = tasks[0];
+
+  return (
+    <div className="relative mr-2">
+      <button
+        className={clsx(
+          'h-8 min-w-8 px-2 flex items-center justify-center gap-1 rounded-md transition-colors',
+          isOpen ? 'bg-surface text-text-primary' : 'text-text-secondary hover:bg-surface hover:text-text-primary',
+        )}
+        onClick={() => setIsOpen((value) => !value)}
+        data-tooltip={t('ui.bottomBar.tooltips.activityCenter', 'Background activity')}
+      >
+        {runningCount > 0 ? <Loader2 size={17} className="animate-spin" /> : <Activity size={17} />}
+        <span className="text-xs tabular-nums">{runningCount > 0 ? runningCount : tasks.length}</span>
+        {errorCount > 0 && <span className="w-1.5 h-1.5 rounded-full bg-red-500" />}
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 6, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.98 }}
+            transition={{ duration: 0.15 }}
+            className="absolute right-0 bottom-10 w-[344px] max-w-[calc(100vw-2rem)] bg-bg-secondary border border-border-color rounded-lg shadow-xl overflow-hidden z-30"
+          >
+            <div className="flex items-center justify-between px-3 py-2 border-b border-border-color">
+              <Text variant={TextVariants.label} className="truncate">
+                {t('ui.bottomBar.activity.title', 'Background activity')}
+              </Text>
+              <button
+                className="p-1 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface"
+                onClick={clearFinishedActivityTasks}
+                data-tooltip={t('ui.bottomBar.activity.clearFinished', 'Clear finished')}
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <div className="max-h-72 overflow-y-auto">
+              {tasks.map((task) => {
+                const progressText = formatTaskProgress(task);
+                const progressPercent =
+                  task.total && task.total > 0 && task.current !== undefined
+                    ? Math.min(100, Math.round((task.current / task.total) * 100))
+                    : null;
+                return (
+                  <div key={task.id} className="px-3 py-2 border-b border-border-color last:border-b-0">
+                    <div className="flex items-start gap-2">
+                      <div className="pt-0.5">
+                        <TaskStatusIcon task={task} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <Text variant={TextVariants.label} className="truncate">
+                            {task.title}
+                          </Text>
+                          {progressText && (
+                            <Text variant={TextVariants.small} className="ml-auto tabular-nums shrink-0">
+                              {progressText}
+                            </Text>
+                          )}
+                        </div>
+                        {task.detail && (
+                          <Text variant={TextVariants.small} className="truncate">
+                            {task.detail}
+                          </Text>
+                        )}
+                        {progressPercent !== null && task.status === 'running' && (
+                          <div className="mt-1 h-1.5 rounded-full bg-surface overflow-hidden">
+                            <div className="h-full rounded-full bg-accent" style={{ width: `${progressPercent}%` }} />
+                          </div>
+                        )}
+                      </div>
+                      {task.status !== 'running' && (
+                        <button
+                          className="p-1 rounded-md text-text-secondary hover:text-text-primary hover:bg-surface"
+                          onClick={() => dismissActivityTask(task.id)}
+                          data-tooltip={t('ui.bottomBar.activity.dismiss', 'Dismiss')}
+                        >
+                          <X size={13} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {latestTask && runningCount === 0 && (
+              <div className="px-3 py-2 bg-surface/50">
+                <Text variant={TextVariants.small} className="truncate">
+                  {latestTask.status === 'error'
+                    ? t('ui.bottomBar.activity.latestError', 'Latest task needs attention')
+                    : t('ui.bottomBar.activity.latestDone', 'Latest task finished')}
+                </Text>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -471,6 +619,7 @@ export default function BottomBar({
           </div>
         </div>
         <div className="grow" />
+        <TaskActivityCenter />
         {isLibraryView ? (
           <div className="flex items-center gap-2">
             <button

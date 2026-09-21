@@ -221,6 +221,14 @@ pub struct ExportPreset {
     pub watermark_font_path: Option<String>,
     #[serde(default)]
     pub watermark_font_size: Option<u32>,
+    #[serde(default)]
+    pub watermark_font_bold: Option<bool>,
+    #[serde(default)]
+    pub watermark_font_bold_strength: Option<u32>,
+    #[serde(default)]
+    pub watermark_font_italic: Option<bool>,
+    #[serde(default)]
+    pub watermark_font_underline: Option<bool>,
     pub watermark_anchor: Option<String>,
     pub watermark_scale: u32,
     pub watermark_spacing: u32,
@@ -253,6 +261,10 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
             watermark_text: Some("Watermark".to_string()),
             watermark_font_path: None,
             watermark_font_size: Some(5),
+            watermark_font_bold: Some(false),
+            watermark_font_bold_strength: Some(3),
+            watermark_font_italic: Some(false),
+            watermark_font_underline: Some(false),
             watermark_anchor: Some("bottomCenter".to_string()),
             watermark_scale: 10,
             watermark_spacing: 5,
@@ -279,6 +291,10 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
             watermark_text: Some("Watermark".to_string()),
             watermark_font_path: None,
             watermark_font_size: Some(5),
+            watermark_font_bold: Some(false),
+            watermark_font_bold_strength: Some(3),
+            watermark_font_italic: Some(false),
+            watermark_font_underline: Some(false),
             watermark_anchor: Some("bottomCenter".to_string()),
             watermark_scale: 10,
             watermark_spacing: 5,

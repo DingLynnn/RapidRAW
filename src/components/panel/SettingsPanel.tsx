@@ -3,9 +3,14 @@ import {
   ArrowLeft,
   Cloud,
   Cpu,
+  Download,
   ExternalLink as ExternalLinkIcon,
   Server,
   Info,
+  HardDrive,
+  CheckCircle,
+  AlertTriangle,
+  RefreshCw,
   Trash2,
   Wifi,
   WifiOff,
@@ -14,6 +19,7 @@ import {
   SlidersHorizontal,
   Keyboard,
   Bookmark,
+  Loader2,
   Scaling,
   Image as ImageIcon,
   Mouse,
@@ -45,6 +51,7 @@ import Text from '../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../types/typography';
 import { useOsPlatform } from '../../hooks/useOsPlatform';
 import { open } from '@tauri-apps/plugin-shell';
+import { useProcessStore } from '../../store/useProcessStore';
 
 interface ConfirmModalState {
   confirmText: string;
@@ -99,6 +106,20 @@ interface TestStatus {
 interface MyLens {
   maker: string;
   model: string;
+}
+
+interface AiModelAsset {
+  category: string;
+  feature: string;
+  fileName: string;
+  id: string;
+  isBundled: boolean;
+  isCached: boolean;
+  isValid: boolean;
+  label: string;
+  sizeBytes: number;
+  source: string;
+  status: string;
 }
 
 const EXECUTE_TIMEOUT = 3000;
@@ -248,6 +269,208 @@ const DataActionItem = ({
           {message}
         </Text>
       )}
+    </div>
+  );
+};
+
+const formatModelBytes = (bytes: number) => {
+  if (!bytes) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / Math.pow(1024, exponent);
+  return `${value >= 10 || exponent === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[exponent]}`;
+};
+
+const AiModelManager = () => {
+  const { t } = useTranslation();
+  const aiModelDownloadStatus = useProcessStore((state) => state.aiModelDownloadStatus);
+  const [assets, setAssets] = useState<AiModelAsset[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [actionId, setActionId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadAssets = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await invoke<AiModelAsset[]>(Invokes.ListAiModelAssets);
+      setAssets(result);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAssets();
+  }, []);
+
+  useEffect(() => {
+    if (!aiModelDownloadStatus) {
+      loadAssets();
+    }
+  }, [aiModelDownloadStatus]);
+
+  const prepareAssets = async (ids: string[]) => {
+    setActionId(ids.length === 1 ? ids[0] : 'all');
+    setError(null);
+    try {
+      const result = await invoke<AiModelAsset[]>(Invokes.PrepareAiModelAssets, { ids });
+      setAssets(result);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const deleteAsset = async (id: string) => {
+    setActionId(id);
+    setError(null);
+    try {
+      const result = await invoke<AiModelAsset[]>(Invokes.DeleteAiModelAsset, { id });
+      setAssets(result);
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const needsDownload = assets.filter((asset) => !asset.isValid);
+  const totalSize = assets.reduce((sum, asset) => sum + (asset.isValid ? asset.sizeBytes : 0), 0);
+
+  const groupedAssets = assets.reduce<Record<string, AiModelAsset[]>>((groups, asset) => {
+    groups[asset.category] = groups[asset.category] || [];
+    groups[asset.category].push(asset);
+    return groups;
+  }, {});
+
+  return (
+    <div className="mt-8 border-t border-border-color pt-6">
+      <div className="flex items-start justify-between gap-4 mb-4">
+        <div>
+          <Text variant={TextVariants.heading}>{t('settings.processing.ai.models.title', 'Local model manager')}</Text>
+          <Text variant={TextVariants.small} className="mt-1">
+            {t(
+              'settings.processing.ai.models.description',
+              'Review, pre-download, verify, and clear local AI model assets without storing them in Git.',
+            )}
+          </Text>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            className="p-2 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-primary"
+            onClick={loadAssets}
+            disabled={isLoading}
+            data-tooltip={t('settings.processing.ai.models.refresh', 'Refresh model status')}
+          >
+            <RefreshCw size={17} className={isLoading ? 'animate-spin' : ''} />
+          </button>
+          <Button
+            onClick={() => prepareAssets(needsDownload.map((asset) => asset.id))}
+            disabled={needsDownload.length === 0 || actionId !== null}
+          >
+            {actionId === 'all' ? <Loader2 size={16} className="animate-spin mr-2" /> : <Download size={16} className="mr-2" />}
+            {needsDownload.length > 0
+              ? t('settings.processing.ai.models.downloadMissing', 'Download missing')
+              : t('settings.processing.ai.models.allReady', 'All ready')}
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 text-sm text-text-secondary mb-4">
+        <div className="flex items-center gap-1.5">
+          <HardDrive size={15} />
+          <span>{formatModelBytes(totalSize)}</span>
+        </div>
+        {aiModelDownloadStatus && (
+          <div className="flex items-center gap-1.5 text-accent">
+            <Loader2 size={15} className="animate-spin" />
+            <span>{aiModelDownloadStatus}</span>
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <div className="mb-4 flex items-start gap-2 rounded-md border border-red-500/40 bg-red-500/10 p-3 text-red-300">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          <Text variant={TextVariants.small}>{error}</Text>
+        </div>
+      )}
+
+      <div className="space-y-4">
+        {Object.entries(groupedAssets).map(([category, group]) => (
+          <div key={category} className="rounded-lg border border-border-color overflow-hidden">
+            <div className="px-3 py-2 bg-bg-primary border-b border-border-color">
+              <Text variant={TextVariants.label} weight={TextWeights.semibold}>
+                {category}
+              </Text>
+            </div>
+            <div className="divide-y divide-border-color">
+              {group.map((asset) => {
+                const isBusy = actionId === asset.id;
+                const statusLabel = asset.isValid
+                  ? asset.source === 'bundled'
+                    ? t('settings.processing.ai.models.bundled', 'Bundled')
+                    : t('settings.processing.ai.models.cached', 'Cached')
+                  : asset.status === 'invalid'
+                    ? t('settings.processing.ai.models.invalid', 'Invalid')
+                    : t('settings.processing.ai.models.missing', 'Missing');
+                return (
+                  <div key={asset.id} className="flex items-center gap-3 px-3 py-3">
+                    <div className="shrink-0">
+                      {asset.isValid ? (
+                        <CheckCircle size={18} className="text-green-500" />
+                      ) : (
+                        <AlertTriangle size={18} className="text-yellow-400" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <Text variant={TextVariants.label} color={TextColors.primary} className="truncate">
+                          {asset.label}
+                        </Text>
+                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-bg-primary text-text-secondary shrink-0">
+                          {statusLabel}
+                        </span>
+                      </div>
+                      <Text variant={TextVariants.small} className="truncate">
+                        {asset.feature} · {asset.fileName} · {formatModelBytes(asset.sizeBytes)}
+                      </Text>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {!asset.isValid && (
+                        <button
+                          className="p-2 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-primary disabled:opacity-50"
+                          onClick={() => prepareAssets([asset.id])}
+                          disabled={actionId !== null}
+                          data-tooltip={t('settings.processing.ai.models.downloadOne', 'Download or repair')}
+                        >
+                          {isBusy ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                        </button>
+                      )}
+                      <button
+                        className="p-2 rounded-md text-text-secondary hover:text-red-400 hover:bg-bg-primary disabled:opacity-50"
+                        onClick={() => deleteAsset(asset.id)}
+                        disabled={actionId !== null || !asset.isCached}
+                        data-tooltip={
+                          asset.isCached
+                            ? t('settings.processing.ai.models.deleteCached', 'Delete cached file')
+                            : t('settings.processing.ai.models.noCachedFile', 'No cached file to delete')
+                        }
+                      >
+                        {isBusy && asset.isCached ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
@@ -2085,6 +2308,8 @@ export default function SettingsPanel({
                   <Text className="mb-4">{t('settings.processing.ai.description')}</Text>
 
                   <AiProviderSwitch selectedProvider={aiProvider} onProviderChange={handleProviderChange} />
+
+                  <AiModelManager />
 
                   <div className="mt-8">
                     <AnimatePresence mode="wait">

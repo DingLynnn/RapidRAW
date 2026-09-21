@@ -1,7 +1,7 @@
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useMemo, useState } from 'react';
-import { Check, Maximize2, X } from 'lucide-react';
+import { Bold, Check, Italic, Maximize2, Underline, X } from 'lucide-react';
 import Dropdown from './Dropdown';
 import ImagePicker from './ImagePicker';
 import Input from './Input';
@@ -17,6 +17,10 @@ interface WatermarkEditorProps {
   anchor: WatermarkAnchor;
   fontPath: string | null;
   fontSize: number;
+  fontBold: boolean;
+  fontBoldStrength: number;
+  fontItalic: boolean;
+  fontUnderline: boolean;
   imageAspectRatio: number;
   imagePath: string | null;
   isExporting: boolean;
@@ -26,6 +30,10 @@ interface WatermarkEditorProps {
   setAnchor: (value: WatermarkAnchor) => void;
   setFontPath: (value: string | null) => void;
   setFontSize: (value: number) => void;
+  setFontBold: (value: boolean) => void;
+  setFontBoldStrength: (value: number) => void;
+  setFontItalic: (value: boolean) => void;
+  setFontUnderline: (value: boolean) => void;
   setImagePath: (value: string | null) => void;
   setOpacity: (value: number) => void;
   setScale: (value: number) => void;
@@ -76,6 +84,10 @@ function WatermarkPreview({
   anchor,
   fontPath,
   fontSize,
+  fontBold,
+  fontBoldStrength,
+  fontItalic,
+  fontUnderline,
   isLarge = false,
   imageAspectRatio,
   imageUrl,
@@ -89,6 +101,10 @@ function WatermarkPreview({
   anchor: WatermarkAnchor;
   fontPath: string | null;
   fontSize: number;
+  fontBold: boolean;
+  fontBoldStrength: number;
+  fontItalic: boolean;
+  fontUnderline: boolean;
   isLarge?: boolean;
   imageAspectRatio: number;
   imageUrl?: string | null;
@@ -119,6 +135,9 @@ function WatermarkPreview({
         : `${Math.max(9, Math.min(30, fontSize * 2.3))}px`;
       styles.lineHeight = 1;
       styles.whiteSpace = 'nowrap';
+      styles.fontWeight = fontBold ? 400 + fontBoldStrength * 50 : 400;
+      styles.fontStyle = fontItalic ? 'italic' : 'normal';
+      styles.textDecoration = fontUnderline ? 'underline' : 'none';
     }
 
     const spacingString = `${spacingPercent}%`;
@@ -216,11 +235,19 @@ interface TextWatermarkControlsProps {
   anchor: WatermarkAnchor;
   fontPath: string | null;
   fontSize: number;
+  fontBold: boolean;
+  fontBoldStrength: number;
+  fontItalic: boolean;
+  fontUnderline: boolean;
   isExporting: boolean;
   opacity: number;
   setAnchor: (value: WatermarkAnchor) => void;
   setFontPath: (value: string | null) => void;
   setFontSize: (value: number) => void;
+  setFontBold: (value: boolean) => void;
+  setFontBoldStrength: (value: number) => void;
+  setFontItalic: (value: boolean) => void;
+  setFontUnderline: (value: boolean) => void;
   setOpacity: (value: number) => void;
   setSpacing: (value: number) => void;
   setText: (value: string) => void;
@@ -233,11 +260,19 @@ function TextWatermarkControls({
   anchor,
   fontPath,
   fontSize,
+  fontBold,
+  fontBoldStrength,
+  fontItalic,
+  fontUnderline,
   isExporting,
   opacity,
   setAnchor,
   setFontPath,
   setFontSize,
+  setFontBold,
+  setFontBoldStrength,
+  setFontItalic,
+  setFontUnderline,
   setOpacity,
   setSpacing,
   setText,
@@ -274,6 +309,38 @@ function TextWatermarkControls({
           )}
         </div>
       </div>
+      <div className="flex items-center gap-2" aria-label="Text style">
+        {[
+          { label: 'Bold', icon: Bold, active: fontBold, onClick: () => setFontBold(!fontBold) },
+          { label: 'Italic', icon: Italic, active: fontItalic, onClick: () => setFontItalic(!fontItalic) },
+          { label: 'Underline', icon: Underline, active: fontUnderline, onClick: () => setFontUnderline(!fontUnderline) },
+        ].map(({ label, icon: Icon, active, onClick }) => (
+          <button
+            key={label}
+            type="button"
+            aria-label={label}
+            aria-pressed={active}
+            data-tooltip={label}
+            disabled={isExporting}
+            onClick={onClick}
+            className={`h-8 w-8 rounded-md border flex items-center justify-center transition-colors ${active ? 'bg-accent text-button-text border-accent' : 'bg-bg-tertiary border-border-color hover:bg-surface'}`}
+          >
+            <Icon size={15} />
+          </button>
+        ))}
+      </div>
+      {fontBold && (
+        <Slider
+          label="Bold Strength"
+          min={1}
+          max={10}
+          step={1}
+          value={fontBoldStrength}
+          onChange={(e) => setFontBoldStrength(parseInt(String(e.target.value)))}
+          defaultValue={3}
+          suffix="%"
+        />
+      )}
       <Dropdown options={anchorOptions} value={anchor} onChange={setAnchor} disabled={isExporting} className="w-full" />
       <div>
         <Slider
@@ -324,6 +391,10 @@ function WatermarkEditPage({
   anchor,
   fontPath,
   fontSize,
+  fontBold,
+  fontBoldStrength,
+  fontItalic,
+  fontUnderline,
   imageAspectRatio,
   isExporting,
   onClose,
@@ -333,6 +404,10 @@ function WatermarkEditPage({
   setAnchor,
   setFontPath,
   setFontSize,
+  setFontBold,
+  setFontBoldStrength,
+  setFontItalic,
+  setFontUnderline,
   setOpacity,
   setSpacing,
   setText,
@@ -377,6 +452,10 @@ function WatermarkEditPage({
               type={type}
               text={text}
               fontSize={fontSize}
+              fontBold={fontBold}
+              fontBoldStrength={fontBoldStrength}
+              fontItalic={fontItalic}
+              fontUnderline={fontUnderline}
               fontPath={fontPath}
               isLarge
             />
@@ -388,11 +467,19 @@ function WatermarkEditPage({
               anchor={anchor}
               fontPath={fontPath}
               fontSize={fontSize}
+              fontBold={fontBold}
+              fontBoldStrength={fontBoldStrength}
+              fontItalic={fontItalic}
+              fontUnderline={fontUnderline}
               isExporting={isExporting}
               opacity={opacity}
               setAnchor={setAnchor}
               setFontPath={setFontPath}
               setFontSize={setFontSize}
+              setFontBold={setFontBold}
+              setFontBoldStrength={setFontBoldStrength}
+              setFontItalic={setFontItalic}
+              setFontUnderline={setFontUnderline}
               setOpacity={setOpacity}
               setSpacing={setSpacing}
               setText={setText}
@@ -411,6 +498,10 @@ export default function WatermarkEditor({
   anchor,
   fontPath,
   fontSize,
+  fontBold,
+  fontBoldStrength,
+  fontItalic,
+  fontUnderline,
   imageAspectRatio,
   imagePath,
   isExporting,
@@ -420,6 +511,10 @@ export default function WatermarkEditor({
   setAnchor,
   setFontPath,
   setFontSize,
+  setFontBold,
+  setFontBoldStrength,
+  setFontItalic,
+  setFontUnderline,
   setImagePath,
   setOpacity,
   setScale,
@@ -515,6 +610,10 @@ export default function WatermarkEditor({
                 type={type}
                 text={text}
                 fontSize={fontSize}
+                fontBold={fontBold}
+                fontBoldStrength={fontBoldStrength}
+                fontItalic={fontItalic}
+                fontUnderline={fontUnderline}
                 fontPath={fontPath}
                 imageUrl={previewImageUrl}
               />
@@ -527,11 +626,19 @@ export default function WatermarkEditor({
             anchor={anchor}
             fontPath={fontPath}
             fontSize={fontSize}
+            fontBold={fontBold}
+            fontBoldStrength={fontBoldStrength}
+            fontItalic={fontItalic}
+            fontUnderline={fontUnderline}
             isExporting={isExporting}
             opacity={opacity}
             setAnchor={setAnchor}
             setFontPath={setFontPath}
             setFontSize={setFontSize}
+            setFontBold={setFontBold}
+            setFontBoldStrength={setFontBoldStrength}
+            setFontItalic={setFontItalic}
+            setFontUnderline={setFontUnderline}
             setOpacity={setOpacity}
             setSpacing={setSpacing}
             setText={setText}
@@ -558,6 +665,10 @@ export default function WatermarkEditor({
             type={type}
             text={text}
             fontSize={fontSize}
+            fontBold={fontBold}
+            fontBoldStrength={fontBoldStrength}
+            fontItalic={fontItalic}
+            fontUnderline={fontUnderline}
             fontPath={fontPath}
           />
           {isEditPageOpen && (
@@ -565,6 +676,10 @@ export default function WatermarkEditor({
               anchor={anchor}
               fontPath={fontPath}
               fontSize={fontSize}
+              fontBold={fontBold}
+              fontBoldStrength={fontBoldStrength}
+              fontItalic={fontItalic}
+              fontUnderline={fontUnderline}
               imageAspectRatio={imageAspectRatio}
               isExporting={isExporting}
               onClose={() => setIsEditPageOpen(false)}
@@ -574,6 +689,10 @@ export default function WatermarkEditor({
               setAnchor={setAnchor}
               setFontPath={setFontPath}
               setFontSize={setFontSize}
+              setFontBold={setFontBold}
+              setFontBoldStrength={setFontBoldStrength}
+              setFontItalic={setFontItalic}
+              setFontUnderline={setFontUnderline}
               setOpacity={setOpacity}
               setSpacing={setSpacing}
               setText={setText}

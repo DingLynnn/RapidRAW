@@ -60,9 +60,11 @@ export enum Invokes {
   GeneratePresetPreview = 'generate_preset_preview',
   GenerateThumbnailsProgressive = 'generate_thumbnails_progressive',
   GenerateUncroppedPreview = 'generate_uncropped_preview',
+  DeleteAiModelAsset = 'delete_ai_model_asset',
   GetFolderTree = 'get_folder_tree',
   GetFolderChildren = 'get_folder_children',
   GetLogFilePath = 'get_log_file_path',
+  ListAiModelAssets = 'list_ai_model_assets',
   GetOrCreateInternalLibraryRoot = 'get_or_create_internal_library_root',
   GetPinnedFolderTrees = 'get_pinned_folder_trees',
   GetSupportedFileTypes = 'get_supported_file_types',
@@ -79,6 +81,7 @@ export enum Invokes {
   LoadPresets = 'load_presets',
   LoadSettings = 'load_settings',
   MoveFiles = 'move_files',
+  PrepareAiModelAssets = 'prepare_ai_model_assets',
   ReadExifForPaths = 'read_exif_for_paths',
   RemoveTagForPaths = 'remove_tag_for_paths',
   RenameFiles = 'rename_files',
@@ -347,6 +350,8 @@ export interface ImageAnalysisResult {
   sharpnessMetric: number;
   centerFocusMetric: number;
   exposureMetric: number;
+  scoreReasons?: string[];
+  suggestedAction?: string;
   width: number;
   height: number;
 }
