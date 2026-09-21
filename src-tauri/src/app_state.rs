@@ -6,14 +6,17 @@ use std::sync::{Arc, Condvar, Mutex};
 
 use image::{DynamicImage, GrayImage};
 use serde::{Deserialize, Serialize};
+use sysinfo::Disks;
 use tokio::sync::Mutex as TokioMutex;
 use tokio::task::JoinHandle;
 use wgpu::{Texture, TextureView};
 
 use crate::ai_processing::AiState;
 use crate::cache_utils::DecodedImageCache;
+use crate::camera_tethering::CameraSession;
 use crate::gpu_processing::GpuProcessor;
 use crate::image_processing::GpuContext;
+use crate::launch_request::ExternalEditSession;
 use crate::lens_correction::LensDatabase;
 use crate::lut_processing::Lut;
 
@@ -64,6 +67,7 @@ pub struct PreviewJob {
     pub is_interactive: bool,
     pub target_resolution: Option<u32>,
     pub roi: Option<(f32, f32, f32, f32)>,
+    pub request_analytics: bool,
     pub compute_waveform: bool,
     pub active_waveform_channel: Option<String>,
     pub responder: tokio::sync::oneshot::Sender<Vec<u8>>,
@@ -92,6 +96,8 @@ pub struct ThumbnailManager {
     pub queue: Mutex<VecDeque<String>>,
     pub cvar: Condvar,
     pub processing_now: Mutex<HashSet<String>>,
+    pub rotational_disk: AtomicBool,
+    pub io_gate: Mutex<()>,
 }
 
 impl ThumbnailManager {
@@ -100,10 +106,35 @@ impl ThumbnailManager {
             queue: Mutex::new(VecDeque::new()),
             cvar: Condvar::new(),
             processing_now: Mutex::new(HashSet::new()),
+            rotational_disk: AtomicBool::new(false),
+            io_gate: Mutex::new(()),
         })
     }
 }
 
+pub struct PendingMetadata {
+    pub virtual_path: String,
+    pub image_path: PathBuf,
+    pub sidecar_path: PathBuf,
+}
+
+pub struct MetadataManager {
+    pub queue: Mutex<VecDeque<PendingMetadata>>,
+    pub cvar: Condvar,
+    pub pending: Mutex<HashSet<PathBuf>>,
+}
+
+impl MetadataManager {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self {
+            queue: Mutex::new(VecDeque::new()),
+            cvar: Condvar::new(),
+            pending: Mutex::new(HashSet::new()),
+        })
+    }
+}
+
+pub type ThumbnailGeometryEntry = (u64, Arc<DynamicImage>, f32);
 pub type TransformedImageCache = (u64, Arc<DynamicImage>, (f32, f32));
 
 pub struct AppState {
@@ -116,13 +147,15 @@ pub struct AppState {
     pub gpu_processor: Mutex<Option<GpuProcessorState>>,
     pub ai_state: Mutex<Option<AiState>>,
     pub ai_init_lock: TokioMutex<()>,
-    pub export_task_handle: Mutex<Option<JoinHandle<()>>>,
+    pub export_task_token: Arc<Mutex<Option<Arc<AtomicBool>>>>,
     pub hdr_result: Arc<Mutex<Option<DynamicImage>>>,
     pub panorama_result: Arc<Mutex<Option<DynamicImage>>>,
+    pub focus_stack_result: Arc<Mutex<Option<DynamicImage>>>,
     pub denoise_result: Arc<Mutex<Option<DynamicImage>>>,
     pub indexing_task_handle: Mutex<Option<JoinHandle<()>>>,
     pub lut_cache: Mutex<HashMap<String, Arc<Lut>>>,
     pub initial_file_path: Mutex<Option<String>>,
+    pub pending_edit_session: Mutex<Option<ExternalEditSession>>,
     pub thumbnail_cancellation_token: Arc<AtomicBool>,
     pub thumbnail_progress: Mutex<ThumbnailProgressTracker>,
     pub preview_worker_tx: Mutex<Option<Sender<PreviewJob>>>,
@@ -130,11 +163,16 @@ pub struct AppState {
     pub mask_cache: Mutex<HashMap<u64, GrayImage>>,
     pub patch_cache: Mutex<HashMap<String, serde_json::Value>>,
     pub geometry_cache: Mutex<HashMap<u64, DynamicImage>>,
-    pub thumbnail_geometry_cache: Mutex<HashMap<String, (u64, DynamicImage, f32)>>,
+    pub thumbnail_geometry_cache: Mutex<HashMap<String, ThumbnailGeometryEntry>>,
     pub lens_db: Mutex<Option<Arc<LensDatabase>>>,
     pub load_image_generation: Arc<AtomicUsize>,
     pub full_warped_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
+    pub patched_warped_cache: Mutex<Option<(u64, Arc<DynamicImage>)>>,
     pub full_transformed_cache: Mutex<Option<TransformedImageCache>>,
     pub decoded_image_cache: Mutex<DecodedImageCache>,
     pub thumbnail_manager: Arc<ThumbnailManager>,
+    pub metadata_manager: Arc<MetadataManager>,
+    pub disks_cache: Mutex<Option<Disks>>,
+    pub disks_cache_refreshing: AtomicBool,
+    pub camera_session: Mutex<CameraSession>,
 }

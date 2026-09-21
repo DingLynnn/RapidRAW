@@ -3,30 +3,132 @@ from pathlib import Path
 
 LOCALES_DIR = Path("./locales")
 
+# Translations for the new Exposure (formerly EV Shift) and Brightness (formerly Exposure) keys
 TRANSLATIONS = {
-    "de": "Schnellfilter",
-    "en": "Quick Filter",
-    "es": "Filtro rápido",
-    "fr": "Filtre rapide",
-    "it": "Filtro rapido",
-    "ja": "クイックフィルター",
-    "ko": "빠른 필터",
-    "pl": "Szybki filtr",
-    "pt": "Filtro rápido",
-    "ru": "Быстрый фильтр",
-    "zh-CN": "快速筛选",
-    "zh-TW": "快速篩選"
+    "ca": {
+        "adjustments": {
+            "basic": {
+                "exposure": "Exposició",
+                "brightness": "Brillantor"
+            }
+        }
+    },
+    "de": {
+        "adjustments": {
+            "basic": {
+                "exposure": "Belichtung",
+                "brightness": "Helligkeit"
+            }
+        }
+    },
+    "en": {
+        "adjustments": {
+            "basic": {
+                "exposure": "Exposure",
+                "brightness": "Brightness"
+            }
+        }
+    },
+    "es": {
+        "adjustments": {
+            "basic": {
+                "exposure": "Exposición",
+                "brightness": "Brillo"
+            }
+        }
+    },
+    "fr": {
+        "adjustments": {
+            "basic": {
+                "exposure": "Exposition",
+                "brightness": "Luminosité"
+            }
+        }
+    },
+    "it": {
+        "adjustments": {
+            "basic": {
+                "exposure": "Esposizione",
+                "brightness": "Luminosità"
+            }
+        }
+    },
+    "ja": {
+        "adjustments": {
+            "basic": {
+                "exposure": "露出",
+                "brightness": "明るさ"
+            }
+        }
+    },
+    "ko": {
+        "adjustments": {
+            "basic": {
+                "exposure": "노출",
+                "brightness": "밝기"
+            }
+        }
+    },
+    "pl": {
+        "adjustments": {
+            "basic": {
+                "exposure": "Ekspozycja",
+                "brightness": "Jasność"
+            }
+        }
+    },
+    "pt": {
+        "adjustments": {
+            "basic": {
+                "exposure": "Exposição",
+                "brightness": "Brilho"
+            }
+        }
+    },
+    "ru": {
+        "adjustments": {
+            "basic": {
+                "exposure": "Экспозиция",
+                "brightness": "Яркость"
+            }
+        }
+    },
+    "zh-CN": {
+        "adjustments": {
+            "basic": {
+                "exposure": "曝光",
+                "brightness": "亮度"
+            }
+        }
+    },
+    "zh-TW": {
+        "adjustments": {
+            "basic": {
+                "exposure": "曝光",
+                "brightness": "亮度"
+            }
+        }
+    }
 }
 
+def deep_merge(target: dict, source: dict):
+    """Recursively merges source dict into target dict."""
+    for key, value in source.items():
+        if isinstance(value, dict):
+            node = target.setdefault(key, {})
+            if isinstance(node, dict):
+                deep_merge(node, value)
+        else:
+            target[key] = value
+
 def sort_dict_recursively(item):
-    """Recursively sorts dictionary keys alphabetically."""
     if isinstance(item, dict):
         return {k: sort_dict_recursively(v) for k, v in sorted(item.items())}
     elif isinstance(item, list):
         return [sort_dict_recursively(x) for x in item]
     return item
 
-def update_json_file(file_path: Path, value: str):
+def update_json_file(file_path: Path, trans: dict):
     if not file_path.exists():
         print(f"Skipping: {file_path.name} (File not found)")
         return
@@ -38,14 +140,14 @@ def update_json_file(file_path: Path, value: str):
         print(f"Error parsing JSON in {file_path.name}. Skipping.")
         return
 
-    if "ui" not in data or not isinstance(data["ui"], dict):
-        data["ui"] = {}
-    if "bottomBar" not in data["ui"] or not isinstance(data["ui"]["bottomBar"], dict):
-        data["ui"]["bottomBar"] = {}
-    if "tooltips" not in data["ui"]["bottomBar"] or not isinstance(data["ui"]["bottomBar"]["tooltips"], dict):
-        data["ui"]["bottomBar"]["tooltips"] = {}
+    # Remove the deprecated evShift key if it exists
+    try:
+        if "evShift" in data.get("adjustments", {}).get("basic", {}):
+            del data["adjustments"]["basic"]["evShift"]
+    except Exception:
+        pass
 
-    data["ui"]["bottomBar"]["tooltips"]["quickFilter"] = value
+    deep_merge(data, trans)
 
     sorted_data = sort_dict_recursively(data)
 
@@ -60,10 +162,10 @@ def main():
         print(f"Error: Locales directory '{LOCALES_DIR}' does not exist.")
         return
 
-    print("Starting sorted translation updates...")
-    for lang, translation in TRANSLATIONS.items():
+    print("Starting translation updates for Exposure and Brightness keys...")
+    for lang, trans in TRANSLATIONS.items():
         file_path = LOCALES_DIR / f"{lang}.json"
-        update_json_file(file_path, translation)
+        update_json_file(file_path, trans)
     print("Done!")
 
 if __name__ == "__main__":

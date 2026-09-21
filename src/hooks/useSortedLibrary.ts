@@ -1,12 +1,13 @@
 import { useMemo } from 'react';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useSettingsStore } from '../store/useSettingsStore';
-import { RawStatus, EditedStatus, SortDirection, ImageFile } from '../components/ui/AppProperties';
+import { RawStatus, EditedStatus, SortDirection, ImageFile, GroupingMode } from '../components/ui/AppProperties';
+import { buildImageGroups, GroupBadgeInfo, GroupId } from '../utils/imageGrouping';
 
 export const ADVANCED_QUERY_REGEX =
   /^(iso|aperture|f|shutter|s|focal|mm|rating|color|camera|make|model|lens|edited|status|type|tag)\s*(?::)?\s*(>=|<=|>|<|=)?\s*(.+)$/i;
 
-export const parseShutter = (val: string | undefined): number => {
+const parseShutter = (val: string | undefined): number => {
   if (!val) return 0;
   const cleanVal = val.replace(/s/i, '').trim();
   const parts = cleanVal.split('/');
@@ -19,14 +20,14 @@ export const parseShutter = (val: string | undefined): number => {
   return isNaN(numVal) ? 0 : numVal;
 };
 
-export const parseAperture = (val: string | undefined): number => {
+const parseAperture = (val: string | undefined): number => {
   if (!val) return 0;
   const match = val.match(/(\d+(\.\d+)?)/);
   const numVal = match ? parseFloat(match[0]) : 0;
   return isNaN(numVal) ? 0 : numVal;
 };
 
-export const parseFocalLength = (val: string | undefined): number => {
+const parseFocalLength = (val: string | undefined): number => {
   if (!val) return 0;
   const match = val.match(/(\d+(\.\d+)?)/);
   if (!match) return 0;
@@ -187,7 +188,6 @@ const evaluateSmartSearchQuery = (
   query: SmartSearchQuery,
   image: ImageFile,
   imageRatings: Record<string, number>,
-  supportedTypes: any,
 ) => {
   if (query.rating) {
     const rating = imageRatings[image.path] || 0;
@@ -207,11 +207,9 @@ const evaluateSmartSearchQuery = (
   if (query.editedStatus === 'edited' && !image.is_edited) return false;
   if (query.editedStatus === 'unedited' && image.is_edited) return false;
 
-  if (query.rawStatus && supportedTypes) {
-    const extension = image.path.split('?vc=')[0].split('.').pop()?.toLowerCase() || '';
-    const isRaw = supportedTypes.raw?.includes(extension);
-    if (query.rawStatus === 'raw' && !isRaw) return false;
-    if (query.rawStatus === 'nonraw' && isRaw) return false;
+  if (query.rawStatus) {
+    if (query.rawStatus === 'raw' && !image.is_raw) return false;
+    if (query.rawStatus === 'nonraw' && image.is_raw) return false;
   }
 
   if (query.colors.length > 0) {
@@ -229,62 +227,19 @@ const evaluateSmartSearchQuery = (
   return true;
 };
 
-export function computeSortedLibrary(libraryState: any, settingsState: any): ImageFile[] {
+export interface GroupedLibrary {
+  displayList: ImageFile[];
+  badges: Map<GroupId, GroupBadgeInfo> | null;
+}
+
+function computeGroupedLibrary(libraryState: any, settingsState: any): GroupedLibrary {
   const { imageList, imageRatings, filterCriteria, searchCriteria, sortCriteria } = libraryState;
-  const { appSettings, supportedTypes } = settingsState;
+  const { appSettings } = settingsState;
 
-  const getParentDir = (filePath: string): string => {
-    const separator = filePath.includes('/') ? '/' : '\\';
-    const lastSeparatorIndex = filePath.lastIndexOf(separator);
-    if (lastSeparatorIndex === -1) {
-      return '';
-    }
-    return filePath.substring(0, lastSeparatorIndex);
-  };
+  const groupingMode: GroupingMode = appSettings?.grouping ?? 'off';
+  const isGroupingActive = groupingMode !== 'off';
 
-  let processedList = imageList;
-
-  if (filterCriteria.rawStatus === RawStatus.RawOverNonRaw && supportedTypes) {
-    const rawBaseNames = new Set<string>();
-
-    for (const image of imageList) {
-      const pathWithoutVC = image.path.split('?vc=')[0];
-      const filename = pathWithoutVC.split(/[\\/]/).pop() || '';
-      const lastDotIndex = filename.lastIndexOf('.');
-      const extension = lastDotIndex !== -1 ? filename.substring(lastDotIndex + 1).toLowerCase() : '';
-
-      if (extension && supportedTypes.raw.includes(extension)) {
-        const baseName = lastDotIndex !== -1 ? filename.substring(0, lastDotIndex) : filename;
-        const parentDir = getParentDir(pathWithoutVC);
-        const uniqueKey = `${parentDir}/${baseName}`;
-        rawBaseNames.add(uniqueKey);
-      }
-    }
-
-    if (rawBaseNames.size > 0) {
-      processedList = imageList.filter((image: ImageFile) => {
-        const pathWithoutVC = image.path.split('?vc=')[0];
-        const filename = pathWithoutVC.split(/[\\/]/).pop() || '';
-        const lastDotIndex = filename.lastIndexOf('.');
-        const extension = lastDotIndex !== -1 ? filename.substring(lastDotIndex + 1).toLowerCase() : '';
-
-        const isNonRaw = extension && supportedTypes.nonRaw.includes(extension);
-
-        if (isNonRaw) {
-          const baseName = lastDotIndex !== -1 ? filename.substring(0, lastDotIndex) : filename;
-          const parentDir = getParentDir(pathWithoutVC);
-          const uniqueKey = `${parentDir}/${baseName}`;
-
-          if (rawBaseNames.has(uniqueKey)) {
-            return false;
-          }
-        }
-        return true;
-      });
-    }
-  }
-
-  const filteredList = processedList.filter((image: ImageFile) => {
+  const matchesFilter = (image: ImageFile): boolean => {
     if (filterCriteria.rating !== 0) {
       const rating = imageRatings[image.path] || 0;
       if (filterCriteria.rating === -1 && rating !== 0) return false;
@@ -292,18 +247,9 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
       if (filterCriteria.rating > 0 && filterCriteria.rating < 5 && rating < filterCriteria.rating) return false;
     }
 
-    if (
-      filterCriteria.rawStatus &&
-      filterCriteria.rawStatus !== RawStatus.All &&
-      filterCriteria.rawStatus !== RawStatus.RawOverNonRaw &&
-      supportedTypes
-    ) {
-      const pathWithoutVC = image.path.split('?vc=')[0];
-      const extension = pathWithoutVC.split('.').pop()?.toLowerCase() || '';
-      const isRaw = supportedTypes.raw?.includes(extension);
-
-      if (filterCriteria.rawStatus === RawStatus.RawOnly && !isRaw) return false;
-      if (filterCriteria.rawStatus === RawStatus.NonRawOnly && isRaw) return false;
+    if (filterCriteria.rawStatus && filterCriteria.rawStatus !== RawStatus.All) {
+      if (filterCriteria.rawStatus === RawStatus.RawOnly && !image.is_raw) return false;
+      if (filterCriteria.rawStatus === RawStatus.NonRawOnly && image.is_raw) return false;
     }
 
     if (filterCriteria.editedStatus && filterCriteria.editedStatus !== EditedStatus.All) {
@@ -320,7 +266,7 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
     }
 
     return true;
-  });
+  };
 
   const { tags: searchTags, text: searchText, mode: searchMode } = searchCriteria;
   const lowerCaseSearchText = searchText.trim().toLowerCase();
@@ -387,48 +333,76 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
         imgStr = image.is_edited ? 'edited' : 'unedited';
       } else if (field === 'type') {
         const extension = image.path.split('?vc=')[0].split('.').pop()?.toLowerCase() || '';
-        const isRaw = supportedTypes?.raw?.includes(extension);
-        imgStr = isRaw ? 'raw' : extension;
+        imgStr = image.is_raw ? 'raw' : extension;
       }
 
       return operator === '=' || operator === ':' ? imgStr.includes(value) : false;
     }
   };
 
-  const filteredBySearch =
-    parsedTags.length === 0 && lowerCaseSearchText === ''
-      ? filteredList
-      : filteredList.filter((image: ImageFile) => {
-          const lowerCaseImageTags = (image.tags || []).map((t) => t.toLowerCase().replace('user:', ''));
-          const filename = image?.path?.split(/[\\/]/)?.pop()?.toLowerCase() || '';
+  const isSearchActive = parsedTags.length > 0 || lowerCaseSearchText !== '';
 
-          let tagsMatch = true;
-          if (parsedTags.length > 0) {
-            const evaluateTag = (parsedTag: any) => {
-              if (parsedTag.type === 'normal') {
-                return lowerCaseImageTags.some((imgTag) => imgTag.includes(parsedTag.value));
-              }
-              return evaluateQuery(parsedTag, image);
-            };
+  const matchesSearch = (image: ImageFile): boolean => {
+    if (!isSearchActive) return true;
 
-            if (searchMode === 'OR') {
-              tagsMatch = parsedTags.some((pt) => evaluateTag(pt));
-            } else {
-              tagsMatch = parsedTags.every((pt) => evaluateTag(pt));
-            }
-          }
+    const lowerCaseImageTags = (image.tags || []).map((t) => t.toLowerCase().replace('user:', ''));
+    const filename = image?.path?.split(/[\\/]/)?.pop()?.toLowerCase() || '';
 
-          let textMatch = true;
-          if (lowerCaseSearchText !== '') {
-            const plainTextMatch =
-              filename.includes(lowerCaseSearchText) || lowerCaseImageTags.some((t) => t.includes(lowerCaseSearchText));
-            textMatch = smartSearchQuery.hasSignals
-              ? evaluateSmartSearchQuery(smartSearchQuery, image, imageRatings, supportedTypes) || plainTextMatch
-              : plainTextMatch;
-          }
+    let tagsMatch = true;
+    if (parsedTags.length > 0) {
+      const evaluateTag = (parsedTag: any) => {
+        if (parsedTag.type === 'normal') {
+          return lowerCaseImageTags.some((imgTag) => imgTag.includes(parsedTag.value));
+        }
+        return evaluateQuery(parsedTag, image);
+      };
 
-          return tagsMatch && textMatch;
-        });
+      if (searchMode === 'OR') {
+        tagsMatch = parsedTags.some((pt: any) => evaluateTag(pt));
+      } else {
+        tagsMatch = parsedTags.every((pt: any) => evaluateTag(pt));
+      }
+    }
+
+    let textMatch = true;
+    if (lowerCaseSearchText !== '') {
+      const plainTextMatch =
+        filename.includes(lowerCaseSearchText) || lowerCaseImageTags.some((t) => t.includes(lowerCaseSearchText));
+      textMatch = smartSearchQuery.hasSignals
+        ? evaluateSmartSearchQuery(smartSearchQuery, image, imageRatings) || plainTextMatch
+        : plainTextMatch;
+    }
+
+    return tagsMatch && textMatch;
+  };
+
+  let processedList = imageList;
+  let searchMatchingGroupIds: Set<string> | null = null;
+
+  if (isGroupingActive) {
+    const groupEditedFiles = appSettings?.groupEditedFiles ?? true;
+    const groupingResult = buildImageGroups(imageList, groupingMode, groupEditedFiles);
+    processedList = groupingResult.displayList;
+
+    if (isSearchActive) {
+      searchMatchingGroupIds = new Set<string>();
+      for (const image of imageList) {
+        if (!image.group_id) continue;
+        if (matchesSearch(image)) {
+          searchMatchingGroupIds.add(image.group_id);
+        }
+      }
+    }
+  }
+
+  const filteredList = processedList.filter((image: ImageFile) => matchesFilter(image));
+
+  const filteredBySearch = !isSearchActive
+    ? filteredList
+    : filteredList.filter((image: ImageFile) => {
+        if (searchMatchingGroupIds && image.group_id && searchMatchingGroupIds.has(image.group_id)) return true;
+        return matchesSearch(image);
+      });
 
   const list = [...filteredBySearch];
 
@@ -488,7 +462,15 @@ export function computeSortedLibrary(libraryState: any, settingsState: any): Ima
     return order === SortDirection.Ascending ? comparison : -comparison;
   });
 
-  return list;
+  const badges = isGroupingActive
+    ? buildImageGroups(imageList, groupingMode, appSettings?.groupEditedFiles ?? true).badges
+    : null;
+
+  return { displayList: list, badges };
+}
+
+export function computeSortedLibrary(libraryState: any, settingsState: any): ImageFile[] {
+  return computeGroupedLibrary(libraryState, settingsState).displayList;
 }
 
 export function useSortedLibrary() {
@@ -499,14 +481,13 @@ export function useSortedLibrary() {
   const sortCriteria = useLibraryStore((state) => state.sortCriteria);
 
   const appSettings = useSettingsStore((state) => state.appSettings);
-  const supportedTypes = useSettingsStore((state) => state.supportedTypes);
 
-  const sortedImageList = useMemo(() => {
-    return computeSortedLibrary(
+  const result = useMemo(() => {
+    return computeGroupedLibrary(
       { imageList, imageRatings, filterCriteria, searchCriteria, sortCriteria },
-      { appSettings, supportedTypes },
+      { appSettings },
     );
-  }, [imageList, sortCriteria, imageRatings, filterCriteria, supportedTypes, searchCriteria, appSettings]);
+  }, [imageList, sortCriteria, imageRatings, filterCriteria, searchCriteria, appSettings]);
 
-  return sortedImageList;
+  return result;
 }

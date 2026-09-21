@@ -39,6 +39,22 @@ impl Default for FilterCriteria {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct FolderTreeSort {
+    pub key: String,
+    pub order: String,
+}
+
+impl Default for FolderTreeSort {
+    fn default() -> Self {
+        Self {
+            key: "name".to_string(),
+            order: "asc".to_string(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct LastFolderState {
     #[serde(default)]
     pub current_folder_path: Option<String>,
@@ -107,6 +123,7 @@ pub fn all_available_adjustments() -> HashSet<String> {
         "lutPath",
         "lutSize",
         "lutData",
+        "lutIsSceneReferred",
         "glowAmount",
         "halationAmount",
         "flareAmount",
@@ -134,6 +151,7 @@ pub fn all_available_adjustments() -> HashSet<String> {
         "lensDistortionEnabled",
         "lensTcaEnabled",
         "lensVignetteEnabled",
+        "guidedPerspective",
     ]
     .iter()
     .map(|s| s.to_string())
@@ -168,6 +186,7 @@ pub fn default_included_adjustments() -> HashSet<String> {
         "lensDistortionEnabled",
         "lensTcaEnabled",
         "lensVignetteEnabled",
+        "guidedPerspective",
     ];
 
     for item in off_by_default.iter() {
@@ -185,6 +204,8 @@ pub struct CopyPasteSettings {
     pub included_adjustments: HashSet<String>,
     #[serde(default)]
     pub known_adjustments: HashSet<String>,
+    #[serde(default)]
+    pub auto_sync: bool,
 }
 
 impl Default for CopyPasteSettings {
@@ -193,6 +214,7 @@ impl Default for CopyPasteSettings {
             mode: PasteMode::Merge,
             included_adjustments: default_included_adjustments(),
             known_adjustments: all_available_adjustments(),
+            auto_sync: false,
         }
     }
 }
@@ -239,6 +261,10 @@ pub struct ExportPreset {
     pub preserve_folders: Option<bool>,
     #[serde(default)]
     pub last_export_path: Option<String>,
+    #[serde(default)]
+    pub destination_type: Option<String>,
+    #[serde(default)]
+    pub subfolder: Option<String>,
 }
 
 pub fn default_export_presets() -> Vec<ExportPreset> {
@@ -272,6 +298,8 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
             export_masks: Some(false),
             preserve_folders: Some(false),
             last_export_path: None,
+            destination_type: Some("customFolder".to_string()),
+            subfolder: Some("".to_string()),
         },
         ExportPreset {
             id: "default-fast".to_string(),
@@ -302,8 +330,74 @@ pub fn default_export_presets() -> Vec<ExportPreset> {
             export_masks: Some(false),
             preserve_folders: Some(false),
             last_export_path: None,
+            destination_type: Some("customFolder".to_string()),
+            subfolder: Some("".to_string()),
         },
     ]
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceState {
+    pub left_panel_width: u32,
+    pub right_panel_width: u32,
+    pub left_top_height: u32,
+    pub right_top_height: u32,
+    pub panel_layout: HashMap<String, Vec<String>>,
+    pub active_panels: HashMap<String, Option<String>>,
+    pub panel_switcher_placement: HashMap<String, String>,
+}
+
+impl Default for WorkspaceState {
+    fn default() -> Self {
+        let mut panel_layout = HashMap::new();
+        #[allow(unused)]
+        let mut left_top = vec![
+            "metadata".to_string(),
+            "folderTree".to_string(),
+            "export".to_string(),
+        ];
+
+        #[cfg(feature = "tethering")]
+        left_top.push("tethering".to_string());
+
+        panel_layout.insert("leftTop".to_string(), left_top);
+        panel_layout.insert("leftBottom".to_string(), vec![]);
+
+        panel_layout.insert(
+            "rightTop".to_string(),
+            vec![
+                "adjustments".to_string(),
+                "crop".to_string(),
+                "masks".to_string(),
+                "ai".to_string(),
+                "presets".to_string(),
+            ],
+        );
+        panel_layout.insert("rightBottom".to_string(), vec![]);
+
+        let mut active_panels = HashMap::new();
+        active_panels.insert("leftTop".to_string(), Some("folderTree".to_string()));
+        active_panels.insert("leftBottom".to_string(), None);
+        active_panels.insert("rightTop".to_string(), Some("adjustments".to_string()));
+        active_panels.insert("rightBottom".to_string(), None);
+
+        let mut panel_switcher_placement = HashMap::new();
+        panel_switcher_placement.insert("leftTop".to_string(), "bottom".to_string());
+        panel_switcher_placement.insert("leftBottom".to_string(), "bottom".to_string());
+        panel_switcher_placement.insert("rightTop".to_string(), "right".to_string());
+        panel_switcher_placement.insert("rightBottom".to_string(), "right".to_string());
+
+        Self {
+            left_panel_width: 320,
+            right_panel_width: 320,
+            left_top_height: 450,
+            right_top_height: 450,
+            panel_layout,
+            active_panels,
+            panel_switcher_placement,
+        }
+    }
 }
 
 pub fn default_linear_raw_mode() -> String {
@@ -354,7 +448,9 @@ pub struct AppSettings {
     pub pinned_folders: Vec<String>,
     pub editor_preview_resolution: Option<u32>,
     #[serde(default)]
-    pub thumbnail_resolution: Option<u32>,
+    pub small_thumbnail_resolution: Option<u32>,
+    #[serde(default)]
+    pub medium_thumbnail_resolution: Option<u32>,
     #[serde(default)]
     pub enable_zoom_hifi: Option<bool>,
     #[serde(default)]
@@ -399,6 +495,8 @@ pub struct AppSettings {
     #[serde(default)]
     pub linux_gpu_optimization: Option<bool>,
     #[serde(default)]
+    pub linux_gpu_optimization_migrated_v1: Option<bool>,
+    #[serde(default)]
     pub library_view_mode: Option<String>,
     #[serde(default = "default_export_presets")]
     pub export_presets: Vec<ExportPreset>,
@@ -423,9 +521,13 @@ pub struct AppSettings {
     #[serde(default)]
     pub use_wgpu_renderer: Option<bool>,
     #[serde(default)]
+    pub editor_neutral_grey_bg: Option<bool>,
+    #[serde(default)]
     pub canvas_input_mode: Option<String>,
     #[serde(default)]
     pub zoom_speed_multiplier: Option<f32>,
+    #[serde(default)]
+    pub zoom_photo_to_pixel_click: Option<bool>,
     #[serde(default)]
     pub keybinds: HashMap<String, Vec<String>>,
     #[serde(default)]
@@ -452,6 +554,26 @@ pub struct AppSettings {
     pub exif_overlay: Option<String>,
     #[serde(default)]
     pub language: Option<String>,
+    #[serde(default)]
+    pub folder_tree_sort: Option<FolderTreeSort>,
+    #[serde(default)]
+    pub library_display_mode: Option<String>,
+    #[serde(default)]
+    pub grouping: Option<String>,
+    #[serde(default)]
+    pub require_matching_exif: Option<bool>,
+    #[serde(default)]
+    pub group_edited_files: Option<bool>,
+    #[serde(default, skip_serializing)] // legacy
+    #[allow(dead_code)]
+    pub group_associated_files: Option<bool>,
+    #[serde(default, skip_serializing)] // legacy
+    #[allow(dead_code)]
+    pub group_preferred_type: Option<String>,
+    #[serde(default)]
+    pub always_decode_raw_thumbnails: Option<bool>,
+    #[serde(default)]
+    pub workspace: WorkspaceState,
 }
 
 impl Default for AppSettings {
@@ -460,7 +582,8 @@ impl Default for AppSettings {
             last_root_path: None,
             root_folders: Vec::new(),
             pinned_folders: Vec::new(),
-            thumbnail_resolution: Some(720),
+            small_thumbnail_resolution: Some(480),
+            medium_thumbnail_resolution: Some(1280),
             #[cfg(target_os = "android")]
             editor_preview_resolution: Some(1280),
             #[cfg(not(target_os = "android"))]
@@ -486,17 +609,15 @@ impl Default for AppSettings {
             thumbnail_size: Some("small".to_string()),
             #[cfg(not(target_os = "android"))]
             thumbnail_size: Some("medium".to_string()),
-            thumbnail_aspect_ratio: Some("cover".to_string()),
+            thumbnail_aspect_ratio: Some("contain".to_string()),
             ai_provider: Some("cpu".to_string()),
             adjustment_visibility: default_adjustment_visibility(),
             open_tree_sections: default_open_tree_sections(),
             copy_paste_settings: CopyPasteSettings::default(),
             raw_highlight_compression: Some(2.5),
             processing_backend: Some("auto".to_string()),
-            #[cfg(target_os = "linux")]
-            linux_gpu_optimization: Some(true),
-            #[cfg(not(target_os = "linux"))]
             linux_gpu_optimization: Some(false),
+            linux_gpu_optimization_migrated_v1: Some(true),
             library_view_mode: Some("flat".to_string()),
             export_presets: default_export_presets(),
             my_lenses: Some(Vec::new()),
@@ -516,8 +637,10 @@ impl Default for AppSettings {
             use_wgpu_renderer: Some(false),
             #[cfg(not(any(target_os = "linux", target_os = "android")))]
             use_wgpu_renderer: Some(true),
+            editor_neutral_grey_bg: Some(false),
             canvas_input_mode: Some("mouse".to_string()),
             zoom_speed_multiplier: Some(1.0),
+            zoom_photo_to_pixel_click: Some(false),
             keybinds: HashMap::new(),
             #[cfg(target_os = "android")]
             thumbnail_worker_threads: Some(2),
@@ -537,6 +660,15 @@ impl Default for AppSettings {
             apply_preprocessing_to_non_raws: Some(false),
             exif_overlay: Some("off".to_string()),
             language: Some("en".to_string()),
+            folder_tree_sort: Some(FolderTreeSort::default()),
+            library_display_mode: Some("grid".to_string()),
+            grouping: Some("off".to_string()),
+            require_matching_exif: Some(false),
+            group_edited_files: Some(true),
+            group_associated_files: Some(false),
+            group_preferred_type: Some("raw".to_string()),
+            always_decode_raw_thumbnails: Some(false),
+            workspace: WorkspaceState::default(),
         }
     }
 }
@@ -552,6 +684,11 @@ pub fn get_settings_path(app_handle: &AppHandle) -> Result<PathBuf, String> {
     }
 
     Ok(settings_dir.join("settings.json"))
+}
+
+#[tauri::command]
+pub fn is_tethering_supported() -> bool {
+    cfg!(feature = "tethering")
 }
 
 #[tauri::command]
@@ -573,6 +710,15 @@ pub fn load_settings(app_handle: AppHandle) -> Result<AppSettings, String> {
         && let Some(last) = &settings.last_root_path
     {
         settings.root_folders.push(last.clone());
+        settings_modified = true;
+    }
+
+    #[cfg(target_os = "linux")]
+    if !settings.linux_gpu_optimization_migrated_v1.unwrap_or(false) {
+        if settings.linux_gpu_optimization == Some(true) {
+            settings.linux_gpu_optimization = Some(false);
+        }
+        settings.linux_gpu_optimization_migrated_v1 = Some(true);
         settings_modified = true;
     }
 

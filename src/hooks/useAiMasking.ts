@@ -59,6 +59,57 @@ export function useAiMasking() {
     [setAdjustments],
   );
 
+  const handleDirectPatch = useCallback(
+    async (subMaskId: string, sourceX: number, sourceY: number) => {
+      const { selectedImage, adjustments, patchesSentToBackend } = useEditorStore.getState();
+      if (!selectedImage?.path) return;
+
+      const patchId = adjustments.aiPatches.find((p: AiPatch) =>
+        p.subMasks.some((sm: SubMask) => sm.id === subMaskId),
+      )?.id;
+      if (!patchId) return;
+
+      setAdjustments((prev: Partial<Adjustments>) => ({
+        ...prev,
+        aiPatches: prev.aiPatches?.map((p: AiPatch) => (p.id === patchId ? { ...p, isLoading: true } : p)),
+      }));
+
+      try {
+        const patchDefinitionForBackend = adjustments.aiPatches.find((p: AiPatch) => p.id === patchId);
+        const isLiquify = patchDefinitionForBackend?.subMasks.some((sm: SubMask) => sm.type === 'liquify');
+        const isRetouch = patchDefinitionForBackend?.subMasks.some((sm: SubMask) => sm.type === 'retouch');
+        const command = isLiquify
+          ? 'generate_liquify_patch'
+          : isRetouch
+            ? 'generate_retouch_patch'
+            : 'generate_manual_cleanup_patch';
+
+        const newPatchDataJson: any = await invoke(command, {
+          currentAdjustments: adjustments,
+          patchDefinition: patchDefinitionForBackend,
+          sourcePoint: [sourceX, sourceY],
+        });
+
+        const newPatchData = JSON.parse(newPatchDataJson);
+        patchesSentToBackend.delete(patchId);
+
+        setAdjustments((prev: Partial<Adjustments>) => ({
+          ...prev,
+          aiPatches: prev.aiPatches?.map((p: AiPatch) =>
+            p.id === patchId ? { ...p, patchData: newPatchData, isLoading: false } : p,
+          ),
+        }));
+      } catch (err: any) {
+        toast.error(`Patch Generation Failed: ${err.message || String(err)}`);
+        setAdjustments((prev: Partial<Adjustments>) => ({
+          ...prev,
+          aiPatches: prev.aiPatches?.map((p: AiPatch) => (p.id === patchId ? { ...p, isLoading: false } : p)),
+        }));
+      }
+    },
+    [setAdjustments],
+  );
+
   const handleGenerativeReplace = useCallback(
     async (patchId: string, prompt: string, useFastInpaint: boolean) => {
       const { selectedImage, adjustments, isGeneratingAi, patchesSentToBackend } = useEditorStore.getState();
@@ -113,7 +164,7 @@ export function useAiMasking() {
         setEditor({ isGeneratingAi: false });
       }
     },
-    [setAdjustments, setEditor],
+    [setAdjustments, setEditor, getToken],
   );
 
   const handleQuickErase = useCallback(
@@ -202,7 +253,7 @@ export function useAiMasking() {
         setEditor({ isGeneratingAi: false });
       }
     },
-    [setAdjustments, setEditor],
+    [setAdjustments, setEditor, getToken],
   );
 
   const handleDeleteMaskContainer = useCallback(
@@ -485,6 +536,7 @@ export function useAiMasking() {
   return {
     updateSubMask,
     handleGenerativeReplace,
+    handleDirectPatch,
     handleQuickErase,
     handleDeleteMaskContainer,
     handleDeleteAiPatch,

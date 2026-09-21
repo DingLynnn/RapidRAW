@@ -2,8 +2,8 @@
   "adjustments": {
     "basic": {
       "blacks": "블랙",
+      "brightness": "밝기",
       "contrast": "대비",
-      "evShift": "EV 시프트",
       "exposure": "노출",
       "highlights": "하이라이트",
       "mappers": {
@@ -112,11 +112,18 @@
     },
     "effects": {
       "amount": "양",
+      "bokehCircular": "원형",
+      "bokehHexagonal": "육각형",
+      "bokehOctagonal": "팔각형",
+      "bokehRing": "버블 (링)",
+      "bokehShape": "보케 모양",
       "creative": "크리에이티브",
       "feather": "페더",
       "glow": "글로우",
       "grain": "그레인",
       "halation": "헐레이션",
+      "lensBlur": "렌즈 블러",
+      "lensDiffusion": "확산",
       "lightFlares": "빛 번짐",
       "lut": "LUT",
       "midpoint": "중간점",
@@ -171,6 +178,7 @@
     },
     "editor": {
       "autoAdjust": "이미지 자동 조정",
+      "autoLensCorrection": "자동 렌즈 교정",
       "cancel": "취소",
       "colorLabel": "색상 레이블",
       "confirmReset": "초기화 확인",
@@ -218,6 +226,10 @@
       "addCopiedToAlbum_other": "복사한 이미지 {{count}}개를 앨범에 추가",
       "refreshView": "보기 새로고침"
     },
+    "merge": {
+      "focusStack": "포커스 스태킹",
+      "title": "병합"
+    },
     "tagging": {
       "addTagTooltip": "태그 추가",
       "noTags": "추가된 태그 없음",
@@ -229,6 +241,8 @@
       "addToAlbum": "앨범에 추가",
       "autoAdjust_one": "이미지 자동 조정",
       "autoAdjust_other": "이미지 자동 조정",
+      "autoLensCorrection_one": "자동 렌즈 교정",
+      "autoLensCorrection_other": "자동 렌즈 교정",
       "collage_one": "이미지 프레임",
       "collage_other": "콜라주 만들기",
       "confirmDelete": "삭제 확인",
@@ -352,20 +366,42 @@
       "dropzoneText": "여기에 놓아 새 편집을 만드세요",
       "editSettingsTitle": "편집 설정",
       "editsTitle": "편집",
+      "generatingDepthMap": "AI 심도 맵 계산 중...",
+      "generativeEditTitle": "생성형 편집",
       "inpaintingTitle": "인페인팅",
+      "liquify": {
+        "mode": "유동화 모드",
+        "modes": {
+          "expand": "볼록 도구",
+          "pinch": "오목 도구",
+          "push": "밀기",
+          "twirl": "소용돌이"
+        }
+      },
+      "manualCleanupTitle": "수동 정리",
       "noImageSelected": "선택된 이미지가 없습니다.",
       "params": {
         "feather": "페더",
-        "grow": "확장"
+        "grow": "확장",
+        "intensity": "강도",
+        "pressure": "압력"
       },
       "patches": {
         "aiEdit": "AI 편집 {{count}}",
         "aiEdit_one": "AI 편집 {{count}}",
         "aiEdit_other": "AI 편집 {{count}}",
+        "clone": "복제 {{count}}",
+        "clone_other": "복제 {{count}}",
+        "heal": "복구 {{count}}",
+        "heal_other": "복구 {{count}}",
         "invertedName": "{{name}} 반전됨",
+        "liquify": "픽셀 유동화 {{count}}",
+        "liquify_one": "픽셀 유동화 {{count}}",
+        "liquify_other": "픽셀 유동화 {{count}}",
         "quickErase": "빠른 지우기 {{count}}",
         "quickErase_one": "빠른 지우기 {{count}}",
-        "quickErase_other": "빠른 지우기 {{count}}"
+        "quickErase_other": "빠른 지우기 {{count}}",
+        "retouch": "리터칭 {{count}}"
       },
       "resetInpaintingTooltip": "인페인팅 초기화",
       "settings": {
@@ -386,7 +422,8 @@
         "quickEraseDesc": "선택 영역을 채워 객체를 제거합니다.",
         "selectionPropertiesTitle": "선택 영역 속성",
         "useBasicInpaint": "기본 인페인팅 사용"
-      }
+      },
+      "touchUpTitle": "터치업"
     },
     "crop": {
       "aspectRatioHeading": "종횡비",
@@ -410,6 +447,10 @@
         "armature": {
           "desc": "골격선 구도",
           "name": "골격선"
+        },
+        "center": {
+          "desc": "중앙선",
+          "name": "중앙"
         },
         "diagonal": {
           "desc": "대각선",
@@ -498,6 +539,24 @@
         "transform": "원근 및 키스톤 보정"
       }
     },
+    "externalEdit": {
+      "done": "완료",
+      "exporting": "내보내는 중…",
+      "savesTo": "외부 편집 — 저장 위치:"
+    },
+    "guided": {
+      "cancel": "취소",
+      "drawingActive": "그리기 활성화",
+      "hint": "사진에서 수직이나 수평이 되어야 하는 가장자리를 따라 그리세요.",
+      "linesStatus": "활성 안내선",
+      "toast": {
+        "angleRejected": "선의 각도가 수평이나 수직에서 너무 벗어났습니다",
+        "maxLines": "수직선 2개, 수평선 2개까지만 허용됩니다"
+      }
+    },
+    "layout": {
+      "split": "분할"
+    },
     "masks": {
       "actions": {
         "addNewComponent": "새 구성 요소 추가",
@@ -527,6 +586,8 @@
         "switchToSubtract": "빼기 모드로 전환"
       },
       "addNewMask": "새 마스크 추가",
+      "aiTitle": "AI 선택",
+      "basicTitle": "기본 도구",
       "brush": {
         "brush": "브러시",
         "eraser": "지우개",
@@ -535,7 +596,6 @@
         "size": "브러시 크기"
       },
       "comingSoon": "출시 예정",
-      "createNewTitle": "새 마스크 만들기",
       "depthRange": {
         "far": "멀리",
         "near": "가까이",
@@ -559,6 +619,7 @@
         "maskName_one": "마스크 {{count}}",
         "maskName_other": "마스크 {{count}}"
       },
+      "rangeTitle": "범위 및 글로벌",
       "resetMaskingTooltip": "마스킹 초기화",
       "settings": {
         "aiModelDownloading": "AI 모델 다운로드 중: ",
@@ -576,11 +637,12 @@
         "select": "선택",
         "selectPresetTooltip": "적용할 프리셋 선택"
       },
+      "toggleAnalyticsInAdjustments": "조정 패널에서 분석 토글",
       "toggleAnalyticsTooltip": "분석 표시 전환",
       "tooltips": {
         "addToCurrent": "{{name}}을(를) 현재 마스크에 추가하거나 새로 만들기 (우클릭)",
         "createNew": "새 {{name}} 마스크 만들기",
-        "showMore": "더 많은 마스크 유형 표시"
+        "selectNewSourcePoint": "{{modifier}} + 클릭하여 새 소스 포인트 선택"
       }
     },
     "metadata": {
@@ -691,10 +753,12 @@
         "info": "정보",
         "inpaint": "인페인팅",
         "masks": "마스크",
-        "presets": "프리셋"
+        "presets": "프리셋",
+        "tethering": "테더링"
       }
     },
     "toolbar": {
+      "switchToVariant": "Switch to {{label}}",
       "tooltips": {
         "aperture": "조리개",
         "backToLibrary": "라이브러리로 돌아가기",
@@ -724,6 +788,12 @@
       "mb": "MB",
       "tb": "TB"
     },
+    "destination": {
+      "customFolder": "사용자 지정 폴더",
+      "originalFolder": "원본 이미지 폴더",
+      "subfolder": "하위 폴더",
+      "subfolderPlaceholder": "예: final, WebP"
+    },
     "dialog": {
       "saveEditedImageTitle": "편집한 이미지 저장",
       "selectFolderTitle": "이미지 {{count}}개를 내보낼 폴더 선택",
@@ -732,7 +802,10 @@
     },
     "file": {
       "quality": "품질",
-      "qualityLossless": "품질 (무손실)"
+      "qualityLossless": "품질 (무손실)",
+      "tiffBitDepth": "TIFF 비트 심도",
+      "tiffBitDepth16": "16비트",
+      "tiffBitDepth8": "8비트"
     },
     "labels": {
       "image": "이미지",
@@ -757,6 +830,7 @@
     },
     "sections": {
       "advanced": "고급",
+      "destination": "대상",
       "fileNaming": "파일 이름 지정",
       "fileSettings": "파일 설정",
       "imageSizing": "이미지 크기",
@@ -766,6 +840,7 @@
     "status": {
       "cancelExport": "내보내기 취소",
       "cancelled": "내보내기가 취소되었습니다",
+      "cancelling": "내보내기 취소 중…",
       "estimatedAverageSize": " ({{size}} 평균)",
       "estimatedSize": "예상 파일 크기: ~{{size}}",
       "estimatedTotalSize": "예상 총 크기: ~{{size}}",
@@ -820,6 +895,31 @@
         "name": "이름 (가나다순)"
       }
     },
+    "culling": {
+      "addTagPlaceholder": "태그 추가...",
+      "altCullingPreviewHighRes": "고해상도 선별 미리보기",
+      "altThumbnailLoading": "썸네일 로딩 중",
+      "aperture": "조리개",
+      "cameraSettings": "카메라 설정",
+      "clickThumbnailsHint": "비교 뷰에 추가하려면 오른쪽 사이드바에서 썸네일을 클릭하세요.",
+      "colorLabel": "색상 라벨",
+      "dimensions": "크기",
+      "editImage": "이미지 편집",
+      "focalLength": "초점 거리",
+      "iso": "ISO",
+      "metadata": "메타데이터",
+      "noMetadataAvailable": "메타데이터 없음",
+      "noTagsAdded": "추가된 태그 없음",
+      "none": "없음",
+      "rateAndLabel": "평가 및 라벨",
+      "rating": "평가",
+      "selectImagesToCompare": "비교할 이미지 선택",
+      "shutterSpeed": "셔터 속도",
+      "syncZoomAndPan": "줌 및 이동 동기화",
+      "tags": "태그",
+      "toggleFit": "1:1 / 맞춤 전환",
+      "vc": "VC"
+    },
     "filters": {
       "edited": {
         "all": "모든 이미지",
@@ -841,7 +941,6 @@
       "raw": {
         "all": "모든 유형",
         "nonRawOnly": "RAW가 아닌 항목만",
-        "preferRaw": "RAW 우선",
         "rawOnly": "RAW만"
       }
     },
@@ -859,10 +958,21 @@
         "folders": "폴더",
         "pinned": "고정됨"
       },
+      "sort": {
+        "created": "생성일",
+        "imageCount": "이미지 수",
+        "modified": "수정일",
+        "name": "알파벳순"
+      },
+      "sourcesTitle": "소스",
       "tooltips": {
         "clearSearch": "검색 지우기",
         "collapse": "접기",
-        "expand": "펼치기"
+        "expand": "펼치기",
+        "moreOptions": "옵션",
+        "navBack": "뒤로",
+        "navForward": "앞으로",
+        "sortFolders": "폴더 정렬"
       }
     },
     "grid": {
@@ -898,6 +1008,12 @@
         "filterByEdited": "편집 상태로 필터링",
         "filterByFileType": "파일 유형으로 필터링",
         "filterByRating": "평점으로 필터링",
+        "groupEditedFiles": "Include edited files in groups",
+        "groupIgnoreMetadata": "Ignore mismatched EXIF dates",
+        "groupOff": "Off",
+        "groupPreferJpeg": "Prefer JPEG",
+        "groupPreferRaw": "Prefer RAW",
+        "groupRawJpeg": "Group RAW + JPEG",
         "metadataAlways": "항상",
         "metadataHover": "마우스 오버 시",
         "metadataOff": "끄기",
@@ -918,6 +1034,7 @@
       "progress": "가져오는 중... ({{current}}/{{total}})"
     },
     "items": {
+      "cloudPlaceholder": "iCloud에 저장됨 — 다운로드되지 않음",
       "collapseFolder": "폴더 접기",
       "currentFolder": "현재 폴더",
       "expandFolder": "폴더 펼치기",
@@ -974,6 +1091,7 @@
     },
     "thumbnailFit": {
       "fillSquare": "정사각형 채우기",
+      "justified": "메이슨리",
       "originalRatio": "원본 비율"
     },
     "thumbnailSize": {
@@ -992,16 +1110,20 @@
     "types": {
       "all": "전체 이미지",
       "brush": "브러시",
+      "clone": "복제",
       "color": "색상",
       "depth": "심도",
       "flow": "플로우",
       "foreground": "전경",
+      "heal": "복구",
       "linear": "선형",
+      "liquify": "픽셀 유동화",
       "luminance": "휘도",
       "others": "기타",
       "quickErase": "빠른 지우기",
       "quickEraser": "빠른 지우개",
       "radial": "원형",
+      "retouch": "리터칭",
       "sky": "하늘",
       "subject": "피사체"
     }
@@ -1052,6 +1174,9 @@
       "confirm": "확인"
     },
     "copyPaste": {
+      "autoSyncDesc": "선택한 모든 이미지에 조정을 자동으로 적용합니다.",
+      "autoSyncLabel": "자동 동기화 활성화",
+      "autoSyncTitle": "조정 자동 동기화",
       "cancel": "취소",
       "descMerge": "복사한 변경 사항을 추가하며 다른 설정은 그대로 둡니다.",
       "descReplace": "선택한 모든 설정을 덮어쓰고 나머지는 기본값으로 초기화합니다.",
@@ -1065,6 +1190,7 @@
         "curves": "커브",
         "exposureToneMapper": "노출 및 톤 매퍼",
         "grain": "그레인",
+        "guidedPerspective": "유도된 원근 보정",
         "halationGlow": "헐레이션 및 글로우",
         "hueShift": "글로벌 색조 시프트",
         "lensCorrection": "렌즈 보정",
@@ -1159,6 +1285,23 @@
       "strengthLabel": "강도",
       "titleBatch": "이미지 노이즈 제거",
       "titleSingle": "이미지 노이즈 제거"
+    },
+    "focusStack": {
+      "cancel": "취소",
+      "close": "닫기",
+      "depthMap": "심도 맵",
+      "description": "초점 거리가 다른 여러 이미지를 결합하여 완벽하게 선명한 단일 이미지를 만듭니다.",
+      "descriptionWithCount_one": "초점 거리가 다른 {{count}}개의 이미지를 결합하여 완벽하게 선명한 단일 이미지를 만듭니다.",
+      "descriptionWithCount_other": "초점 거리가 다른 {{count}}개의 이미지를 결합하여 완벽하게 선명한 단일 이미지를 만듭니다.",
+      "failed": "포커스 스태킹 실패",
+      "initializing": "초기화 중...",
+      "openInEditor": "편집기에서 열기",
+      "result": "결과",
+      "save": "저장",
+      "savedSuccess": "포커스 스택이 성공적으로 저장되었습니다!",
+      "stacking": "포커스 스태킹 중",
+      "start": "시작",
+      "title": "포커스 스태킹"
     },
     "hdr": {
       "cancel": "취소",
@@ -1295,7 +1438,10 @@
       "cancel": "취소",
       "compareTooltip": "길게 눌러 비교",
       "distortion": "왜곡",
+      "geometry": "기하학",
+      "guided": "유도된 원근 보정",
       "horizontal": "수평",
+      "manual": "수동 변형",
       "maskWarning": "변형은 기본 지오메트리를 변경합니다. 기존 마스크가 이동할 수 있으며 AI 마스크는 다시 생성해야 합니다.",
       "offset": "오프셋",
       "original": "원본",
@@ -1342,6 +1488,9 @@
       "speed": "속도",
       "title": "마우스 컨트롤",
       "zoom": "확대/축소 속도 배율",
+      "zoomClick": "사진 100% 확대",
+      "zoomClickDesc": "클릭 시 에디터의 사진을 100% 확대",
+      "zoomClickInfo": "사진을 클릭하면 즉시 100%(1:1 픽셀)로 확대되어 선명도와 노이즈를 평가할 수 있습니다. 비활성화된 경우 클릭하면 점진적으로 확대됩니다.",
       "zoomDesc": "스크롤 휠이나 핀치 제스처를 사용할 때 캔버스가 확대/축소되는 속도를 조정합니다."
     },
     "data": {
@@ -1367,10 +1516,16 @@
         "confirmClearAll": "모든 태그 지우기",
         "confirmClearCache": "캐시 지우기",
         "confirmDeleteAllEdits": "모든 편집 삭제",
+        "confirmResetLayout": "레이아웃 초기화",
+        "confirmResetLayoutTitle": "작업 공간 레이아웃 초기화",
         "confirmTitle": "삭제 확인",
+        "resetLayoutMessage": "작업 공간 레이아웃을 초기화하시겠습니까? 도킹된 모든 패널, 너비 및 전환기 위치가 기본값으로 복원됩니다.",
         "sidecarMessage": "모든 사이드카 파일을 삭제하시겠습니까?\n\n모든 활성 루트 폴더 및 하위 폴더 내의 모든 이미지에 대한 편집 내용이 영구적으로 제거됩니다."
       },
       "noFolders": "선택된 폴더 없음",
+      "resetLayoutButton": "레이아웃 초기화",
+      "resetLayoutDesc": "패널 도크, 측면 분할기, 높이 및 패널 전환기를 기본 레이아웃으로 복원합니다.",
+      "resetLayoutTitle": "작업 공간 레이아웃 초기화",
       "statuses": {
         "aiSuccess": "{{count}}개 파일이 업데이트되었습니다. AI 태그가 제거되었습니다.",
         "aiSuccess_one": "{{count}}개 파일이 업데이트되었습니다. AI 태그가 제거되었습니다.",
@@ -1384,7 +1539,9 @@
         "clearingCache": "썸네일 캐시를 지우는 중...",
         "deleting": "사이드카 파일을 삭제하는 중입니다. 잠시 기다려 주세요...",
         "failedToGetPath": "로그 파일 경로를 가져올 수 없습니다.",
+        "layoutResetSuccess": "작업 공간 레이아웃이 기본값으로 초기화되었습니다.",
         "processing": "처리 중...",
+        "resettingLayout": "작업 공간 초기화 중...",
         "sidecarSuccess": "사이드카 파일 {{count}}개가 성공적으로 삭제되었습니다.",
         "sidecarSuccess_one": "사이드카 파일 {{count}}개가 성공적으로 삭제되었습니다.",
         "sidecarSuccess_other": "사이드카 파일 {{count}}개가 성공적으로 삭제되었습니다."
@@ -1398,6 +1555,7 @@
       "displayEditIcon": "편집 아이콘 표시",
       "displayEditIconDesc": "편집된 썸네일에 작은 슬라이더 아이콘을 표시합니다.",
       "enableFocusMode": "집중 모드 활성화",
+      "enableNeutralGreyCanvas": "뉴트럴 그레이 배경 활성화",
       "enableOsTitlebar": "OS 제목 표시줄 활성화",
       "enableXmpSync": "XMP 동기화 활성화",
       "focusMode": "집중 모드",
@@ -1408,6 +1566,8 @@
       "fontDesc": "애플리케이션 글꼴을 변경합니다.",
       "nativeTitlebar": "네이티브 제목 표시줄",
       "nativeTitlebarDesc": "RapidRAW의 사용자 지정 제목 표시줄 대신 시스템 기본 창 제목 표시줄을 사용합니다.",
+      "neutralGreyCanvas": "뉴트럴 그레이 캔버스",
+      "neutralGreyCanvasDesc": "앱 테마를 변경하지 않고 더 정확한 색상 및 노출 보정을 위해 뉴트럴 그레이 캔버스를 사용합니다.",
       "poppins": "Poppins",
       "showImageCounts": "이미지 개수 표시",
       "system": "시스템 기본값",
@@ -1429,9 +1589,12 @@
         "color_label_yellow": "색상 레이블: 노랑",
         "copy_adjustments": "선택한 조정값 복사",
         "copy_files": "선택한 파일 복사",
+        "copy_image_path": "선택한 이미지의 경로 복사",
         "cycle_zoom": "확대/축소 순환 (맞춤, 2배 맞춤, 100%)",
         "delete_selected": "선택한 파일 삭제",
+        "focus_search": "검색창에 포커스",
         "open_image": "선택한 이미지 열기",
+        "open_settings": "설정 열기",
         "paste_adjustments": "복사한 조정값 붙여넣기",
         "paste_files": "현재 폴더에 파일 붙여넣기",
         "preview_next": "다음 이미지",
@@ -1450,14 +1613,18 @@
         "toggle_adjustments": "조정 패널 전환",
         "toggle_ai": "AI 패널 전환",
         "toggle_analytics": "분석 표시 전환",
+        "toggle_bottom_panel": "필름스트립 토글",
         "toggle_crop": "자르기 / 수평 맞추기 전환",
         "toggle_crop_panel": "자르기 패널 전환",
         "toggle_export": "내보내기 패널 전환",
+        "toggle_folder_tree": "폴더 트리 패널 토글",
         "toggle_fullscreen": "전체 화면 전환",
+        "toggle_left_panel": "왼쪽 패널 토글",
         "toggle_library_exif": "EXIF 오버레이 전환",
         "toggle_masks": "마스크 패널 전환",
         "toggle_metadata": "메타데이터 패널 전환",
         "toggle_presets": "프리셋 패널 전환",
+        "toggle_right_panel": "오른쪽 패널 토글",
         "undo": "조정 실행 취소",
         "zoom_100": "100%로 확대/축소",
         "zoom_fit": "맞춤으로 확대/축소",
@@ -1538,6 +1705,9 @@
         },
         "title": "생성형 AI"
       },
+      "alwaysDecodeRaw": "항상 RAW 디코딩",
+      "alwaysDecodeRawDesc": "포함된 JPEG 미리보기를 사용하는 대신 썸네일에 대해 전체 RAW 디코딩을 강제합니다. 썸네일의 색상이나 대비가 열린 이미지와 다르게 보이는 경우 이 옵션을 활성화하세요.",
+      "alwaysDecodeRawLabel": "썸네일에 대해 항상 RAW 디코딩",
       "backend": "처리 백엔드",
       "backendDesc": "그래픽 API를 선택합니다. 'Auto'를 권장합니다. 일부 시스템의 충돌을 해결할 수 있습니다.",
       "backends": {
@@ -1562,6 +1732,8 @@
       "livePreviewQualityDesc": "슬라이더를 드래그하는 동안 이미지의 해상도와 압축을 제어합니다. 품질이 낮을수록 응답성이 크게 향상됩니다.",
       "livePreviews": "실시간 인터랙티브 미리보기",
       "livePreviewsDesc": "슬라이더를 드래그하는 동안 미리보기를 즉시 업데이트합니다. 조정 중에 인터페이스가 끊긴다고 느껴지면 비활성화하세요.",
+      "mediumThumbnailRes": "편집기 썸네일 해상도",
+      "mediumThumbnailResDesc": "전체 이미지가 편집기에 로드되는 동안 표시되는 미리보기의 해상도입니다.",
       "modes": {
         "dynamic": "동적",
         "static": "고정 해상도"
@@ -1610,6 +1782,8 @@
       "renderScaleDesc": "디스플레이를 기준으로 렌더 해상도를 조정합니다. 값이 낮을수록 약간의 선명도를 희생하여 고해상도 화면에서 성능이 향상됩니다.",
       "restartRequired": "처리 엔진 변경 사항을 적용하려면 애플리케이션을 다시 시작해야 합니다.",
       "saveRelaunch": "저장 및 다시 시작",
+      "smallThumbnailRes": "그리드 썸네일 해상도",
+      "smallThumbnailResDesc": "라이브러리 그리드에 표시되는 썸네일의 해상도입니다.",
       "staticDesc": "편집기가 고정된 해상도로 이미지를 렌더링합니다. 이 모드는 가장 빠르고 일관성이 있어, 픽셀 단위 정밀 확대보다 부드러운 성능이 우선시되는 저사양 하드웨어에 이상적입니다.",
       "staticPreviewRes": "정적 미리보기 해상도",
       "staticPreviewResDesc": "자르기 모드, 렌즈 보정, 원근 도구 등 정적 미리보기의 해상도를 설정합니다. 메인 편집기 미리보기에는 영향을 주지 않습니다.",
@@ -1660,10 +1834,12 @@
         "depth": "AI 심도 마스킹 기능을 가능하게 하는 강력한 단안 심도 추정 모델을 제공해 주었습니다.",
         "lama": "콘텐츠 인식 채우기와 객체 제거를 가능하게 하는 강력하고 간단한 이미지 인페인팅 모델을 제공해 주었습니다.",
         "lensfun": "자동 렌즈 보정을 위한 귀중한 오픈소스 라이브러리와 방대한 데이터베이스를 제공해 주었습니다.",
+        "libgphoto2": "RapidRAW의 테더링 및 원격 촬영 시스템을 구동하는 포괄적인 카메라 통신 라이브러리를 제공해 주셔서.",
         "negpy": "네거티브 변환 로직에 영감을 주었습니다.",
         "nind": "RapidRAW의 AI 노이즈 감소 기능을 구동하는 AI 모델을 제공해 주었습니다.",
         "rawler": "이 프로젝트의 RAW 파일 처리 기반이 되는 훌륭한 Rust 크레이트를 제공해 주었습니다.",
         "sam2": "AI 피사체 감지 기능에 사용되는 파운데이션 모델을 제공해 주었습니다.",
+        "spektrafilm": "RapidRAW의 내장 필름 에뮬레이션을 구동하는, Andrea Volpato의 스펙트럼 기반 필름 에뮬레이션 LUT를 제공해 주셔서. CC BY-SA 4.0 라이선스입니다.",
         "u2net": "AI 하늘 및 전경 감지 기능에 사용되는 견고한 아키텍처를 제공해 주었습니다.",
         "you": "RapidRAW를 사용하고 지원해 주셔서 감사합니다. 여러분의 관심이 이 프로젝트를 살아 숨 쉬고 발전하게 합니다.",
         "youLabel": "여러분"
@@ -1680,15 +1856,72 @@
       "goHome": "홈으로 이동"
     }
   },
+  "tethering": {
+    "aperture": "조리개",
+    "aperturePlaceholder": "예: 2.8",
+    "autoApplyPreset": "프리셋 자동 적용",
+    "autoOpenCaptured": "촬영된 이미지 자동으로 열기",
+    "cameraConnected": "카메라 연결됨",
+    "capturing": "촬영 중...",
+    "changePreset": "변경",
+    "clearPreset": "프리셋 제거",
+    "connectCamera": "카메라 연결",
+    "expComp": "노출 보정",
+    "expCompPlaceholder": "예: 0.0",
+    "expMode": "노출 모드",
+    "exposureSettings": "노출 설정",
+    "flipHorizontal": "좌우 대칭",
+    "generalSettings": "일반 설정",
+    "ghostOverlayAlt": "고스트 오버레이",
+    "iso": "ISO",
+    "isoPlaceholder": "예: 400",
+    "liveViewAlt": "라이브 뷰",
+    "metering": "측광 모드",
+    "noCameraDetected": "감지된 카메라 없음",
+    "noCamerasFound": "카메라를 찾을 수 없습니다. 연결 상태와 PC 원격 모드를 확인하세요.",
+    "overlayLastShot": "이전 촬영 오버레이",
+    "overlayOff": "끄기",
+    "rotate90": "90° 회전",
+    "scanTooltip": "카메라 검색",
+    "selectCamera": "카메라 선택",
+    "selectCameraPlaceholder": "카메라를 선택하세요",
+    "shutter": "셔터",
+    "shutterPlaceholder": "예: 1/200",
+    "startLiveView": "라이브 뷰 시작",
+    "status": "상태",
+    "stopLiveView": "라이브 뷰 중지",
+    "title": "테더링",
+    "toasts": {
+      "afFailed": "자동 초점 실행에 실패했습니다",
+      "cameraDisconnected": "카메라 연결이 끊어졌습니다",
+      "captureFailed": "촬영 실패: {{err}}",
+      "communicationFailed": "카메라와 통신하지 못했습니다",
+      "connectionFailed": "연결 실패: {{err}}",
+      "detectionFailed": "감지 실패: {{err}}",
+      "noCamerasFound": "카메라를 찾을 수 없습니다. PC 원격 모드인지 확인하세요.",
+      "presetApplyFailed": "촬영된 이미지에 프리셋 적용 실패",
+      "selectFolderFirst": "라이브러리에서 먼저 일반 폴더를 선택하세요.",
+      "setFailed": "{{key}} 설정 실패: {{err}}"
+    },
+    "triggerAutofocus": "자동 초점 실행",
+    "triggerCapture": "촬영",
+    "wbTemp": "색온도 (K)",
+    "wbTempPlaceholder": "예: 5600",
+    "whiteBalance": "화이트 밸런스"
+  },
   "ui": {
     "bottomBar": {
       "imagesSelected": "이미지 {{total}}개 중 {{current}}개 선택됨",
       "tooltips": {
         "collapseFilmstrip": "필름스트립 접기",
+        "collapseLeft": "왼쪽 패널 접기",
+        "collapseRight": "오른쪽 패널 접기",
         "copyPasteSettings": "설정 복사 및 붙여넣기",
         "copySettings": "설정 복사",
         "customZoom": "클릭하여 사용자 지정 확대/축소 비율 입력",
         "expandFilmstrip": "필름스트립 펼치기",
+        "expandLeft": "왼쪽 패널 펼치기",
+        "expandRight": "오른쪽 패널 펼치기",
         "export": "내보내기",
         "pasteSettings": "설정 붙여넣기",
         "quickFilter": "빠른 필터",
@@ -1736,9 +1969,15 @@
     },
     "lut": {
       "clearLut": "LUT 지우기",
+      "customLuts": "사용자 LUT",
+      "empty": "아직 LUT가 없습니다 — 가져오기를 수행하세요",
+      "filmEmulations": "필름 에뮬레이션",
       "filterLabel": "LUT 파일",
+      "import": "프로필 가져오기",
+      "importFailed": "LUT 가져오기 실패",
       "intensity": "강도",
       "label": "LUT",
+      "removeLut": "LUT 제거",
       "select": "선택",
       "selectLutFile": "LUT 파일 선택",
       "unsupportedFormat": "지원되지 않는 파일 형식이 감지되었습니다: .{{ext}}"

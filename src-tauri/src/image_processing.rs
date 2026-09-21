@@ -1,8 +1,9 @@
 use crate::gpu_processing::WgpuDisplay;
+use crate::guided_perspective::{GuideLine, compute_guided_homography, count_valid_lines};
 use bytemuck::{Pod, Zeroable};
 use glam::{Mat3, Vec2, Vec3};
 use image::{DynamicImage, GenericImageView, Rgb32FImage, Rgba};
-use imageproc::geometric_transformations::{Interpolation, rotate_about_center};
+use imageproc::geometric_transformations::{Border, Interpolation, rotate_about_center};
 use nalgebra::{Matrix3 as NaMatrix3, Vector3 as NaVector3};
 use rawler::decoders::Orientation;
 use rayon::prelude::*;
@@ -14,8 +15,8 @@ use std::f32::consts::PI;
 use std::sync::Arc;
 
 pub use crate::gpu_processing::{
-    RenderRequest, get_or_init_gpu_context, process_and_get_dynamic_image,
-    process_and_get_dynamic_image_with_analytics,
+    RenderOutputPrecision, RenderRequest, get_or_init_gpu_context, process_and_get_dynamic_image,
+    process_and_get_dynamic_image_with_analytics, process_and_get_dynamic_image_with_precision,
 };
 use crate::{AppState, mask_generation::MaskDefinition};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
@@ -79,7 +80,7 @@ pub struct Crop {
     pub height: f64,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GeometryParams {
     pub distortion: f32,
     pub vertical: f32,
@@ -104,6 +105,10 @@ pub struct GeometryParams {
     pub vig_k1: f32,
     pub vig_k2: f32,
     pub vig_k3: f32,
+    #[serde(default)]
+    pub guided_lines: Vec<GuideLine>,
+    #[serde(default)]
+    pub guided_perspective_enabled: bool,
 }
 
 impl Default for GeometryParams {
@@ -132,6 +137,8 @@ impl Default for GeometryParams {
             vig_k1: 0.0,
             vig_k2: 0.0,
             vig_k3: 0.0,
+            guided_lines: Vec::new(),
+            guided_perspective_enabled: false,
         }
     }
 }
@@ -140,6 +147,16 @@ pub fn get_geometry_params_from_json(adjustments: &serde_json::Value) -> Geometr
     let lens_params = adjustments
         .get("lensDistortionParams")
         .and_then(|v| v.as_object());
+
+    let guided = adjustments.get("guidedPerspective");
+    let guided_perspective_enabled = guided
+        .and_then(|g| g.get("enabled"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let guided_lines: Vec<GuideLine> = guided
+        .and_then(|g| g.get("lines"))
+        .and_then(|v| serde_json::from_value(v.clone()).ok())
+        .unwrap_or_default();
 
     GeometryParams {
         distortion: adjustments["transformDistortion"].as_f64().unwrap_or(0.0) as f32,
@@ -191,6 +208,8 @@ pub fn get_geometry_params_from_json(adjustments: &serde_json::Value) -> Geometr
         vig_k3: lens_params
             .and_then(|p| p.get("vig_k3").and_then(|k| k.as_f64()))
             .unwrap_or(0.0) as f32,
+        guided_lines,
+        guided_perspective_enabled,
     }
 }
 
@@ -325,23 +344,24 @@ pub fn downscale_f32_image(image: &DynamicImage, nwidth: u32, nheight: u32) -> D
                     let src_end = row_offset + x_in_end * 3;
                     let src_slice = &src[src_start..src_end];
 
-                    for (&w_x, chunk) in x_wts.iter().zip(src_slice.chunks_exact(3)) {
+                    for (&w_x, chunk) in x_wts.iter().zip(src_slice.as_chunks::<3>().0) {
                         let w = w_x * w_y;
 
                         let r = chunk[0].max(0.0);
                         let g = chunk[1].max(0.0);
                         let b = chunk[2].max(0.0);
 
-                        r_sum += r * r * w;
-                        g_sum += g * g * w;
-                        b_sum += b * b * w;
+                        r_sum += r * w;
+                        g_sum += g * w;
+                        b_sum += b * w;
                     }
                 }
 
                 let out_idx = x_out * 3;
-                row[out_idx] = r_sum.sqrt();
-                row[out_idx + 1] = g_sum.sqrt();
-                row[out_idx + 2] = b_sum.sqrt();
+
+                row[out_idx] = r_sum;
+                row[out_idx + 1] = g_sum;
+                row[out_idx + 2] = b_sum;
             }
         });
 
@@ -447,7 +467,32 @@ fn build_transform_matrices(
     );
     let m_offset = NaMatrix3::new(1.0, 0.0, off_x, 0.0, 1.0, off_y, 0.0, 0.0, 1.0);
 
-    let forward = t_center * m_offset * m_perspective * m_rotate * m_scale * t_uncenter;
+    let guided_m = if params.guided_perspective_enabled
+        && count_valid_lines(&params.guided_lines, width as f64, height as f64) >= 2
+    {
+        if let Some(res) =
+            compute_guided_homography(&params.guided_lines, width as f64, height as f64)
+        {
+            let h = res.forward_h;
+            NaMatrix3::new(
+                h[0][0] as f32,
+                h[0][1] as f32,
+                h[0][2] as f32,
+                h[1][0] as f32,
+                h[1][1] as f32,
+                h[1][2] as f32,
+                h[2][0] as f32,
+                h[2][1] as f32,
+                h[2][2] as f32,
+            )
+        } else {
+            NaMatrix3::identity()
+        }
+    } else {
+        NaMatrix3::identity()
+    };
+
+    let forward = t_center * m_offset * m_perspective * m_rotate * m_scale * guided_m * t_uncenter;
     let half_diagonal =
         ((width as f64 * width as f64 + height as f64 * height as f64).sqrt()) / 2.0;
 
@@ -714,7 +759,7 @@ pub fn warp_image_geometry(image: &DynamicImage, params: GeometryParams) -> Dyna
             let y_f = y as f32;
             let mut current_vec = origin_vec + (step_vec_y * y_f);
 
-            for pixel in row_pixel_data.chunks_exact_mut(3) {
+            for pixel in row_pixel_data.as_chunks_mut::<3>().0.iter_mut() {
                 if current_vec.z.abs() > 1e-6 {
                     let inv_z = 1.0 / current_vec.z;
                     let mut src_x = current_vec.x * inv_z;
@@ -838,7 +883,7 @@ pub fn unwarp_image_geometry(warped_image: &DynamicImage, params: GeometryParams
         .for_each(|(y, row_pixel_data)| {
             let y_f = y as f32;
 
-            for (x, pixel) in row_pixel_data.chunks_exact_mut(3).enumerate() {
+            for (x, pixel) in row_pixel_data.as_chunks_mut::<3>().0.iter_mut().enumerate() {
                 let x_f = x as f32;
                 let mut current_x = x_f;
                 let mut current_y = y_f;
@@ -937,6 +982,182 @@ pub fn unwarp_image_geometry(warped_image: &DynamicImage, params: GeometryParams
     DynamicImage::ImageRgb32F(out_img)
 }
 
+pub fn inverse_transform_mask(
+    mask: image::GrayImage,
+    adjustments: &serde_json::Value,
+) -> image::GrayImage {
+    let rotation_degrees = adjustments
+        .get("rotation")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.0) as f32;
+    let mask_dyn = image::DynamicImage::ImageLuma8(mask);
+
+    let unrotated_fine = if rotation_degrees.abs() > 1e-5 {
+        crate::image_processing::apply_rotation(mask_dyn, -rotation_degrees).into_owned()
+    } else {
+        mask_dyn
+    };
+
+    let flip_h = adjustments
+        .get("flipHorizontal")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let flip_v = adjustments
+        .get("flipVertical")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let flipped = apply_flip(unrotated_fine, flip_h, flip_v).into_owned();
+
+    let steps = adjustments
+        .get("orientationSteps")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0) as u8;
+    let inverse_steps = (4 - (steps % 4)) % 4;
+    let unrotated_coarse = apply_coarse_rotation(flipped, inverse_steps).into_owned();
+
+    let unwarped = apply_unwarp_geometry(unrotated_coarse, adjustments).into_owned();
+
+    unwarped.into_luma8()
+}
+
+pub fn inverse_transform_point(
+    mut x: f64,
+    mut y: f64,
+    mut curr_w: f64,
+    mut curr_h: f64,
+    adjustments: &serde_json::Value,
+) -> (f64, f64) {
+    let rotation_degrees = adjustments
+        .get("rotation")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.0);
+    if rotation_degrees.abs() > 1e-5 {
+        let cx = curr_w / 2.0;
+        let cy = curr_h / 2.0;
+        let theta_rad = -rotation_degrees * std::f64::consts::PI / 180.0;
+        let cos_t = theta_rad.cos();
+        let sin_t = theta_rad.sin();
+
+        let dx = x - cx;
+        let dy = y - cy;
+        x = cx + dx * cos_t - dy * sin_t;
+        y = cy + dx * sin_t + dy * cos_t;
+    }
+
+    let flip_h = adjustments
+        .get("flipHorizontal")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let flip_v = adjustments
+        .get("flipVertical")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    if flip_h {
+        x = curr_w - x;
+    }
+    if flip_v {
+        y = curr_h - y;
+    }
+
+    let steps = adjustments
+        .get("orientationSteps")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0) as u8;
+    let inverse_steps = (4 - (steps % 4)) % 4;
+    for _ in 0..inverse_steps {
+        let new_x = curr_h - y;
+        let new_y = x;
+        x = new_x;
+        y = new_y;
+        std::mem::swap(&mut curr_w, &mut curr_h);
+    }
+
+    let params = get_geometry_params_from_json(adjustments);
+    let width = curr_w as f32;
+    let height = curr_h as f32;
+
+    let (forward_transform, cx_f32, cy_f32, hd) = build_transform_matrices(&params, width, height);
+    let cx = cx_f32 as f64;
+    let cy = cy_f32 as f64;
+    let inv = forward_transform
+        .try_inverse()
+        .unwrap_or(nalgebra::Matrix3::identity());
+
+    let vec = inv * nalgebra::Vector3::new(x as f32, y as f32, 1.0);
+    if vec.z.abs() > 1e-6 {
+        let inv_z = 1.0 / (vec.z as f64);
+        let mut src_x = (vec.x as f64) * inv_z;
+        let mut src_y = (vec.y as f64) * inv_z;
+
+        let k_distortion = (params.distortion as f64 / 100.0) * 2.5;
+        let lk1 = params.lens_dist_k1 as f64;
+        let lk2 = params.lens_dist_k2 as f64;
+        let lk3 = params.lens_dist_k3 as f64;
+        let lens_dist_amt = (params.lens_distortion_amount as f64) * 2.5;
+
+        let has_lens_correction = params.lens_distortion_enabled
+            && (lk1.abs() > 1e-6 || lk2.abs() > 1e-6 || lk3.abs() > 1e-6);
+        let is_ptlens = params.lens_model == 1;
+
+        let auto_crop_scale = if has_lens_correction || k_distortion.abs() > 1e-5 {
+            compute_lens_auto_crop_scale(&params, width, height)
+        } else {
+            1.0
+        };
+
+        if auto_crop_scale > 1.0 {
+            src_x = cx + (src_x - cx) / auto_crop_scale;
+            src_y = cy + (src_y - cy) / auto_crop_scale;
+        }
+
+        if has_lens_correction {
+            let dx = src_x - cx;
+            let dy = src_y - cy;
+            let ru = (dx * dx + dy * dy).sqrt();
+
+            if ru > 1e-6 {
+                let ru_norm = ru / hd;
+                let ru_norm2 = ru_norm * ru_norm;
+
+                let rd_norm = if is_ptlens {
+                    let a = lk1;
+                    let b = lk2;
+                    let c = lk3;
+                    let d = 1.0 - a - b - c;
+                    ru_norm * (a * ru_norm2 * ru_norm + b * ru_norm2 + c * ru_norm + d)
+                } else {
+                    ru_norm
+                        * (1.0
+                            + lk1 * ru_norm2
+                            + lk2 * (ru_norm2 * ru_norm2)
+                            + lk3 * (ru_norm2 * ru_norm2 * ru_norm2))
+                };
+
+                let effective_r_norm = ru_norm + (rd_norm - ru_norm) * lens_dist_amt;
+                let scale = effective_r_norm / ru_norm;
+
+                src_x = cx + (dx * scale);
+                src_y = cy + (dy * scale);
+            }
+        }
+
+        if k_distortion.abs() > 1e-5 {
+            let max_radius_sq_inv = 1.0 / (cx * cx + cy * cy);
+            let dx = src_x - cx;
+            let dy = src_y - cy;
+            let r2_norm = (dx * dx + dy * dy) * max_radius_sq_inv;
+            let f = 1.0 + k_distortion * r2_norm;
+
+            src_x = cx + (dx * f);
+            src_y = cy + (dy * f);
+        }
+
+        return (src_x, src_y);
+    }
+
+    (x, y)
+}
+
 pub fn apply_cpu_default_raw_processing(image: &mut DynamicImage) {
     let mut f32_image = image.to_rgb32f();
 
@@ -973,18 +1194,14 @@ pub fn apply_srgb_to_linear(mut image: DynamicImage) -> DynamicImage {
 
     match &mut image {
         DynamicImage::ImageRgb32F(img) => {
-            for p in img.pixels_mut() {
-                p[0] = to_linear(p[0]);
-                p[1] = to_linear(p[1]);
-                p[2] = to_linear(p[2]);
-            }
+            img.as_mut().par_iter_mut().for_each(|c| *c = to_linear(*c));
         }
         DynamicImage::ImageRgba32F(img) => {
-            for p in img.pixels_mut() {
+            img.par_chunks_mut(4).for_each(|p| {
                 p[0] = to_linear(p[0]);
                 p[1] = to_linear(p[1]);
                 p[2] = to_linear(p[2]);
-            }
+            });
         }
         _ => {}
     }
@@ -1003,18 +1220,14 @@ pub fn apply_linear_to_srgb(mut image: DynamicImage) -> DynamicImage {
 
     match &mut image {
         DynamicImage::ImageRgb32F(img) => {
-            for p in img.pixels_mut() {
-                p[0] = to_srgb(p[0]);
-                p[1] = to_srgb(p[1]);
-                p[2] = to_srgb(p[2]);
-            }
+            img.as_mut().par_iter_mut().for_each(|c| *c = to_srgb(*c));
         }
         DynamicImage::ImageRgba32F(img) => {
-            for p in img.pixels_mut() {
+            img.par_chunks_mut(4).for_each(|p| {
                 p[0] = to_srgb(p[0]);
                 p[1] = to_srgb(p[1]);
                 p[2] = to_srgb(p[2]);
-            }
+            });
         }
         _ => {}
     }
@@ -1027,9 +1240,9 @@ pub fn apply_orientation(image: DynamicImage, orientation: Orientation) -> Dynam
         Orientation::HorizontalFlip => image.fliph(),
         Orientation::Rotate180 => image.rotate180(),
         Orientation::VerticalFlip => image.flipv(),
-        Orientation::Transpose => image.rotate90().flipv(),
+        Orientation::Transpose => image.rotate90().fliph(),
         Orientation::Rotate90 => image.rotate90(),
-        Orientation::Transverse => image.rotate90().fliph(),
+        Orientation::Transverse => image.rotate270().fliph(),
         Orientation::Rotate270 => image.rotate270(),
     }
 }
@@ -1087,7 +1300,7 @@ pub fn apply_rotation<'a>(
         &rgba_image,
         rotation_degrees * PI / 180.0,
         Interpolation::Bilinear,
-        Rgba([0.0f32, 0.0, 0.0, 0.0]),
+        Border::Constant(Rgba([0.0f32, 0.0, 0.0, 0.0])),
     );
 
     Cow::Owned(DynamicImage::ImageRgba32F(rotated))
@@ -1144,6 +1357,10 @@ pub fn apply_flip<'a>(
 }
 
 pub fn is_geometry_identity(params: &GeometryParams) -> bool {
+    if params.guided_perspective_enabled && params.guided_lines.len() >= 2 {
+        return false;
+    }
+
     let dist_identity = !params.lens_distortion_enabled
         || ((params.lens_distortion_amount - 1.0).abs() < 1e-4
             && params.lens_dist_k1.abs() < 1e-6
@@ -1293,7 +1510,7 @@ pub struct GlobalAdjustments {
     pub has_lut: u32,
     pub lut_intensity: f32,
     pub tonemapper_mode: u32,
-    _pad_lut2: f32,
+    pub lut_is_scene_referred: u32,
     _pad_lut3: f32,
     _pad_lut4: f32,
     _pad_lut5: f32,
@@ -1462,7 +1679,7 @@ const SCALES: AdjustmentScales = AdjustmentScales {
     highlights: 120.0,
     shadows: 120.0,
     whites: 30.0,
-    blacks: 70.0,
+    blacks: 40.0,
     saturation: 100.0,
     temperature: 25.0,
     tint: 100.0,
@@ -1472,9 +1689,9 @@ const SCALES: AdjustmentScales = AdjustmentScales {
     sharpness_threshold: 100.0,
     luma_noise_reduction: 100.0,
     color_noise_reduction: 100.0,
-    clarity: 200.0,
+    clarity: 125.0,
     dehaze: 750.0,
-    structure: 200.0,
+    structure: 125.0,
     centré: 250.0,
 
     vignette_amount: 100.0,
@@ -1973,7 +2190,7 @@ fn get_global_adjustments_from_json(
     let tone_mapper = js_adjustments["toneMapper"].as_str().unwrap_or("basic");
     let (pipe_to_rendering, rendering_to_pipe) = calculate_agx_matrices();
 
-    let (has_lut, lut_intensity) = if is_visible("effects") {
+    let (has_lut, lut_intensity, lut_is_scene_referred) = if is_visible("effects") {
         (
             if js_adjustments["lutPath"].is_string() {
                 1
@@ -1981,9 +2198,17 @@ fn get_global_adjustments_from_json(
                 0
             },
             js_adjustments["lutIntensity"].as_f64().unwrap_or(100.0) as f32 / 100.0,
+            if js_adjustments["lutIsSceneReferred"]
+                .as_bool()
+                .unwrap_or(false)
+            {
+                1
+            } else {
+                0
+            },
         )
     } else {
-        (0, 1.0)
+        (0, 1.0, 0)
     };
 
     GlobalAdjustments {
@@ -2075,7 +2300,7 @@ fn get_global_adjustments_from_json(
 
         tonemapper_mode: tonemapper_override
             .unwrap_or_else(|| if tone_mapper == "agx" { 1 } else { 0 }),
-        _pad_lut2: 0.0,
+        lut_is_scene_referred,
         _pad_lut3: 0.0,
         _pad_lut4: 0.0,
         _pad_lut5: 0.0,
@@ -2444,9 +2669,9 @@ pub fn remove_raw_artifacts_and_enhance(
                     let (r, g, b) = yc_to_rgb(cy, out_cb, out_cr);
 
                     let o = x * 3;
-                    row[o] = r.clamp(0.0, 1.0);
-                    row[o + 1] = g.clamp(0.0, 1.0);
-                    row[o + 2] = b.clamp(0.0, 1.0);
+                    row[o] = r.max(0.0);
+                    row[o + 1] = g.max(0.0);
+                    row[o + 2] = b.max(0.0);
                 }
             });
     }
@@ -2543,9 +2768,9 @@ fn apply_gentle_detail_enhance(
 
                 let safe_boost = boost * scale.clamp(0.0, 1.0);
 
-                rgb_row[r_idx] = (r + safe_boost).clamp(0.0, 1.0);
-                rgb_row[g_idx] = (g + safe_boost).clamp(0.0, 1.0);
-                rgb_row[b_idx] = (b + safe_boost).clamp(0.0, 1.0);
+                rgb_row[r_idx] = (r + safe_boost).max(0.0);
+                rgb_row[g_idx] = (g + safe_boost).max(0.0);
+                rgb_row[b_idx] = (b + safe_boost).max(0.0);
             }
         });
 }
@@ -2577,7 +2802,7 @@ pub fn calculate_histogram_from_image(image: &DynamicImage) -> Result<HistogramD
             let raw = f32_img.as_raw();
             raw.par_chunks(30_000)
                 .fold(init_hist, |mut acc, chunk| {
-                    for pixel in chunk.chunks_exact(3).step_by(2) {
+                    for pixel in chunk.as_chunks::<3>().0.iter().step_by(2) {
                         let r = (pixel[0].clamp(0.0, 1.0) * 255.0) as usize;
                         let g = (pixel[1].clamp(0.0, 1.0) * 255.0) as usize;
                         let b = (pixel[2].clamp(0.0, 1.0) * 255.0) as usize;
@@ -2598,7 +2823,7 @@ pub fn calculate_histogram_from_image(image: &DynamicImage) -> Result<HistogramD
             let raw = rgb.as_raw();
             raw.par_chunks(30_000)
                 .fold(init_hist, |mut acc, chunk| {
-                    for pixel in chunk.chunks_exact(3).step_by(2) {
+                    for pixel in chunk.as_chunks::<3>().0.iter().step_by(2) {
                         let r = pixel[0] as usize;
                         let g = pixel[1] as usize;
                         let b = pixel[2] as usize;
@@ -3322,7 +3547,10 @@ fn classify_scene(
         return SceneKind::Snow;
     }
 
-    if skin_percent > 0.035 && skin_percent > sky_percent * 0.6 && skin_percent > foliage_percent * 0.5 {
+    if skin_percent > 0.035
+        && skin_percent > sky_percent * 0.6
+        && skin_percent > foliage_percent * 0.5
+    {
         return SceneKind::Portrait;
     }
 
@@ -3367,7 +3595,11 @@ fn analyze_smart_tone_stats(image: &DynamicImage) -> SmartToneStats {
 
         let max_c = r.max(g).max(b);
         let min_c = r.min(g).min(b);
-        let saturation = if max_c > 0.0 { (max_c - min_c) / max_c } else { 0.0 };
+        let saturation = if max_c > 0.0 {
+            (max_c - min_c) / max_c
+        } else {
+            0.0
+        };
         mean_saturation += saturation;
 
         let (hue, hsv_sat, value) = rgb_to_hsv(r / 255.0, g / 255.0, b / 255.0);
@@ -3607,7 +3839,8 @@ pub fn generate_smart_tone_suggestions(image: &DynamicImage) -> Vec<SmartToneSug
     let stats = analyze_smart_tone_stats(image);
     let scene = stats.scene;
     let base_tags = smart_tone_tags(stats);
-    let confidence = (0.92 - stats.clipped_percent * 10.0 + ((220.0 - stats.range).max(0.0) / 220.0) * 0.04)
+    let confidence = (0.92 - stats.clipped_percent * 10.0
+        + ((220.0 - stats.range).max(0.0) / 220.0) * 0.04)
         .clamp(0.72, 0.97);
     let clean_vibrance_delta = match scene {
         SceneKind::Landscape => 12.0,
@@ -3694,7 +3927,11 @@ pub fn generate_smart_tone_suggestions(image: &DynamicImage) -> Vec<SmartToneSug
         confidence: (confidence - 0.04).clamp(0.68, 0.95),
         tags: with_scene_tag(
             scene,
-            vec!["LUT 风格".to_string(), "暖高光".to_string(), "柔和过渡".to_string()],
+            vec![
+                "LUT 风格".to_string(),
+                "暖高光".to_string(),
+                "柔和过渡".to_string(),
+            ],
         ),
         adjustments: smart_adjustments(
             &auto,
@@ -3735,7 +3972,11 @@ pub fn generate_smart_tone_suggestions(image: &DynamicImage) -> Vec<SmartToneSug
         confidence: (confidence - 0.02).clamp(0.7, 0.96),
         tags: with_scene_tag(
             scene,
-            vec!["色彩鲜明".to_string(), "细节清晰".to_string(), "适合风光".to_string()],
+            vec![
+                "色彩鲜明".to_string(),
+                "细节清晰".to_string(),
+                "适合风光".to_string(),
+            ],
         ),
         adjustments: smart_adjustments(
             &auto,
@@ -3769,7 +4010,11 @@ pub fn generate_smart_tone_suggestions(image: &DynamicImage) -> Vec<SmartToneSug
         confidence: (confidence - 0.03).clamp(0.69, 0.95),
         tags: with_scene_tag(
             scene,
-            vec!["自然肤色".to_string(), "柔和对比".to_string(), "温和色彩".to_string()],
+            vec![
+                "自然肤色".to_string(),
+                "柔和对比".to_string(),
+                "温和色彩".to_string(),
+            ],
         ),
         adjustments: smart_adjustments(
             &auto,

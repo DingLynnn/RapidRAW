@@ -6,7 +6,7 @@ import { ImageDimensions } from '../hooks/useImageRenderSize';
 import { ToolType } from '../components/panel/right/Masks';
 import { OverlayMode } from '../components/panel/right/CropPanel';
 
-export interface InteractivePatch {
+interface InteractivePatch {
   url: string;
   normX: number;
   normY: number;
@@ -14,10 +14,18 @@ export interface InteractivePatch {
   normH: number;
 }
 
+interface BaseRenderSize extends ImageDimensions {
+  containerHeight: number;
+  containerWidth: number;
+  offsetX: number;
+  offsetY: number;
+}
+
 interface EditorState {
   // Core Image & Adjustments
   selectedImage: SelectedImage | null;
   adjustments: Adjustments;
+  previewOverride: Adjustments | null;
 
   // History State
   history: Adjustments[];
@@ -26,7 +34,6 @@ interface EditorState {
   // Previews & Overlays
   finalPreviewUrl: string | null;
   uncroppedAdjustedPreviewUrl: string | null;
-  transformedOriginalUrl: string | null;
   interactivePatch: InteractivePatch | null;
   showOriginal: boolean;
 
@@ -42,7 +49,7 @@ interface EditorState {
   zoom: number;
   displaySize: ImageDimensions;
   previewSize: ImageDimensions;
-  baseRenderSize: ImageDimensions;
+  baseRenderSize: BaseRenderSize;
   originalSize: ImageDimensions;
 
   // Tools State
@@ -51,6 +58,7 @@ interface EditorState {
   overlayRotation: number;
   isStraightenActive: boolean;
   isWbPickerActive: boolean;
+  isGuidedPerspectiveActive: boolean;
   liveRotation: number | null;
   brushSettings: BrushSettings | null;
 
@@ -83,6 +91,7 @@ interface EditorState {
 export const useEditorStore = create<EditorState>((set) => ({
   selectedImage: null,
   adjustments: INITIAL_ADJUSTMENTS,
+  previewOverride: null,
   history: [INITIAL_ADJUSTMENTS],
   historyIndex: 0,
 
@@ -105,15 +114,15 @@ export const useEditorStore = create<EditorState>((set) => ({
   zoom: 1,
   displaySize: { width: 0, height: 0 },
   previewSize: { width: 0, height: 0 },
-  baseRenderSize: { width: 0, height: 0 },
+  baseRenderSize: { width: 0, height: 0, offsetX: 0, offsetY: 0, containerWidth: 0, containerHeight: 0 },
   originalSize: { width: 0, height: 0 },
 
   isRotationActive: false,
   overlayMode: 'thirds',
   overlayRotation: 0,
-  transformedOriginalUrl: null,
   isStraightenActive: false,
   isWbPickerActive: false,
+  isGuidedPerspectiveActive: false,
   liveRotation: null,
 
   copiedSectionAdjustments: null,

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { Status } from '../components/ui/ExportImportProperties';
 import { useProcessStore } from '../store/useProcessStore';
 import { useEditorStore } from '../store/useEditorStore';
@@ -26,6 +27,7 @@ export function useTauriListeners({
   });
 
   const thumbnailBuffer = useRef<Record<string, string>>({});
+  const mediumThumbnailBuffer = useRef<Record<string, string>>({});
   const ratingBuffer = useRef<Record<string, number>>({});
   const editStatusBuffer = useRef<Record<string, boolean>>({});
   const flushHandle = useRef<number | null>(null);
@@ -38,16 +40,19 @@ export function useTauriListeners({
       if (!isEffectActive) return;
 
       const pendingThumbs = thumbnailBuffer.current;
+      const pendingMediumThumbs = mediumThumbnailBuffer.current;
       const pendingRatings = ratingBuffer.current;
       const pendingEdits = editStatusBuffer.current;
 
       thumbnailBuffer.current = {};
+      mediumThumbnailBuffer.current = {};
       ratingBuffer.current = {};
       editStatusBuffer.current = {};
 
       if (Object.keys(pendingThumbs).length > 0) {
         useProcessStore.getState().setProcess((state) => ({
           thumbnails: { ...state.thumbnails, ...pendingThumbs },
+          mediumThumbnails: { ...state.mediumThumbnails, ...pendingMediumThumbs },
         }));
       }
 
@@ -73,18 +78,19 @@ export function useTauriListeners({
       listen('preview-update-uncropped', (event: any) => {
         if (isEffectActive) useEditorStore.getState().setEditor({ uncroppedAdjustedPreviewUrl: event.payload });
       }),
-      listen('histogram-update', (event: any) => {
+      listen('analytics-update', (event: any) => {
         if (isEffectActive && event.payload.path === useEditorStore.getState().selectedImage?.path) {
-          useEditorStore.getState().setEditor({ histogram: event.payload.data });
+          const update: { histogram?: any; waveform?: any } = {};
+          if (event.payload.histogram != null) update.histogram = event.payload.histogram;
+          if (event.payload.waveform != null) update.waveform = event.payload.waveform;
+          useEditorStore.getState().setEditor(update);
         }
       }),
       listen('open-with-file', (event: any) => {
         if (isEffectActive) useProcessStore.getState().setProcess({ initialFileToOpen: event.payload as string });
       }),
-      listen('waveform-update', (event: any) => {
-        if (isEffectActive && event.payload.path === useEditorStore.getState().selectedImage?.path) {
-          useEditorStore.getState().setEditor({ waveform: event.payload.data });
-        }
+      listen('external-edit-session', (event: any) => {
+        if (isEffectActive) useProcessStore.getState().setProcess({ externalEditSession: event.payload });
       }),
       listen('thumbnail-progress', (event: any) => {
         if (isEffectActive)
@@ -97,10 +103,15 @@ export function useTauriListeners({
       }),
       listen('thumbnail-generated', (event: any) => {
         if (!isEffectActive) return;
-        const { path, data, rating, is_edited } = event.payload;
+        const { path, thumbnailPath, previewPath, rating, is_edited, data } = event.payload;
 
-        if (data) {
+        if (thumbnailPath && previewPath) {
+          thumbnailBuffer.current[path] = convertFileSrc(thumbnailPath.replace(/\\/g, '/'));
+          mediumThumbnailBuffer.current[path] = convertFileSrc(previewPath.replace(/\\/g, '/'));
+          refs.current.markGenerated(path);
+        } else if (data) {
           thumbnailBuffer.current[path] = data;
+          mediumThumbnailBuffer.current[path] = data;
           refs.current.markGenerated(path);
         }
         if (rating !== undefined) {
@@ -109,9 +120,20 @@ export function useTauriListeners({
         if (is_edited !== undefined) {
           editStatusBuffer.current[path] = is_edited;
         }
-        if (data || rating !== undefined || is_edited !== undefined) {
+        if (thumbnailPath || data || rating !== undefined || is_edited !== undefined) {
           scheduleFlush();
         }
+      }),
+      listen('image-metadata-loaded', (event: any) => {
+        if (!isEffectActive) return;
+        const { path, rating, is_edited, tags } = event.payload;
+
+        useLibraryStore.getState().setLibrary((state) => ({
+          imageRatings: { ...state.imageRatings, [path]: rating },
+          imageList: state.imageList.map((img) =>
+            img.path === path ? { ...img, is_edited, tags: tags ?? img.tags } : img,
+          ),
+        }));
       }),
       listen('ai-model-download-start', (event: any) => {
         if (isEffectActive) {
@@ -203,6 +225,9 @@ export function useTauriListeners({
             .getState()
             .completeActivityTask('batch-export', 'error', typeof event.payload === 'string' ? event.payload : 'Export failed');
         }
+      }),
+      listen('export-cancelling', () => {
+        if (isEffectActive) useProcessStore.getState().setExportState({ status: Status.Cancelling });
       }),
       listen('export-cancelled', () => {
         if (isEffectActive) {
@@ -384,6 +409,42 @@ export function useTauriListeners({
               finalImageBase64: null,
               isProcessing: false,
               progressMessage: 'An error occurred.',
+            },
+          }));
+        }
+      }),
+      listen('focus-stack-progress', (event: any) => {
+        if (isEffectActive) {
+          useUIStore.getState().setUI((state) => {
+            if (state.focusStackModalState.finalImageBase64 || state.focusStackModalState.error) return state;
+            return { focusStackModalState: { ...state.focusStackModalState, progressMessage: event.payload } };
+          });
+        }
+      }),
+      listen('focus-stack-complete', (event: any) => {
+        if (isEffectActive) {
+          useUIStore.getState().setUI((state) => ({
+            focusStackModalState: {
+              ...state.focusStackModalState,
+              error: null,
+              finalImageBase64: event.payload.base64,
+              depthMapBase64: event.payload.depthMap,
+              isProcessing: false,
+              progressMessage: null,
+            },
+          }));
+        }
+      }),
+      listen('focus-stack-error', (event: any) => {
+        if (isEffectActive) {
+          useUIStore.getState().setUI((state) => ({
+            focusStackModalState: {
+              ...state.focusStackModalState,
+              error: String(event.payload),
+              finalImageBase64: null,
+              depthMapBase64: null,
+              isProcessing: false,
+              progressMessage: null,
             },
           }));
         }

@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { RotateCcw, Copy, ClipboardPaste, Aperture, ChartArea } from 'lucide-react';
+import { RotateCcw, Copy, ClipboardPaste, PencilSparkles, ChartArea } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { useTranslation } from 'react-i18next';
@@ -15,7 +15,7 @@ import { Adjustments, SectionVisibility, INITIAL_ADJUSTMENTS, ADJUSTMENT_SECTION
 import { useContextMenu } from '../../../context/ContextMenuContext';
 import { OPTION_SEPARATOR, Orientation } from '../../ui/AppProperties';
 import Text from '../../ui/Text';
-import { TextVariants } from '../../../types/typography';
+import { TextVariants, TextColors, TextWeights } from '../../../types/typography';
 import { useShallow } from 'zustand/react/shallow';
 import { useEditorStore } from '../../../store/useEditorStore';
 import { useSettingsStore } from '../../../store/useSettingsStore';
@@ -28,7 +28,7 @@ export default function Controls() {
   const { showContextMenu } = useContextMenu();
   const { isResizingWaveform, onToggleWaveform, setActiveWaveformChannel, handleWaveformResize } =
     useWaveformControls();
-  const { setAdjustments, handleAutoAdjustments, handleLutSelect } = useEditorActions();
+  const { setAdjustments, handleAutoAdjustments, handleLutSelect, setLutPreviewOverride } = useEditorActions();
 
   const { appSettings, theme } = useSettingsStore(
     useShallow((state) => ({
@@ -209,16 +209,16 @@ export default function Controls() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
+      <div className="p-3 flex justify-between items-center shrink-0 border-b border-surface">
         <Text variant={TextVariants.title}>{t('editor.adjustments.title')}</Text>
         <div className="flex items-center gap-1">
           <button
-            className="p-2 rounded-full hover:bg-surface disabled:cursor-not-allowed transition-colors"
-            disabled={!selectedImage?.isReady}
+            className="p-2 rounded-full hover:bg-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            disabled={!selectedImage}
             onClick={handleAutoAdjustments}
             data-tooltip={t('editor.adjustments.tooltips.autoAdjust')}
           >
-            <Aperture size={18} />
+            <PencilSparkles size={18} />
           </button>
           <button
             className={clsx(
@@ -250,7 +250,7 @@ export default function Controls() {
             transition={{ duration: isResizingWaveform ? 0 : 0.2, ease: 'easeOut' }}
             className="shrink-0 flex flex-col relative border-b border-surface overflow-hidden"
           >
-            <div className="grow w-full h-full p-4 pb-2 min-h-0">
+            <div className="grow w-full h-full p-3 pb-2 min-h-0">
               <Waveform
                 waveformData={waveform || null}
                 histogram={histogram}
@@ -271,44 +271,58 @@ export default function Controls() {
         )}
       </AnimatePresence>
 
-      <div className="grow overflow-y-auto p-4 flex flex-col gap-2">
-        {Object.keys(ADJUSTMENT_SECTIONS).map((sectionName: string) => {
-          const SectionComponent: any = {
-            basic: BasicAdjustments,
-            curves: CurveGraph,
-            color: ColorPanel,
-            details: DetailsPanel,
-            effects: EffectsPanel,
-          }[sectionName];
+      <div className="grow overflow-y-scroll p-3 flex flex-col gap-2">
+        {selectedImage ? (
+          Object.keys(ADJUSTMENT_SECTIONS).map((sectionName: string) => {
+            const SectionComponent: any = {
+              basic: BasicAdjustments,
+              curves: CurveGraph,
+              color: ColorPanel,
+              details: DetailsPanel,
+              effects: EffectsPanel,
+            }[sectionName];
 
-          const title = t(`editor.adjustments.sections.${sectionName}`);
-          const sectionVisibility = adjustments.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility;
+            const title = t(`editor.adjustments.sections.${sectionName}`);
+            const sectionVisibility = adjustments.sectionVisibility || INITIAL_ADJUSTMENTS.sectionVisibility;
 
-          return (
-            <div className="shrink-0 group" key={sectionName}>
-              <CollapsibleSection
-                isContentVisible={sectionVisibility[sectionName as keyof SectionVisibility]}
-                isOpen={collapsibleSectionsState[sectionName as keyof typeof collapsibleSectionsState]}
-                onContextMenu={(e: any) => handleSectionContextMenu(e, sectionName)}
-                onToggle={() => handleToggleSection(sectionName)}
-                onToggleVisibility={() => handleToggleVisibility(sectionName)}
-                title={title}
-              >
-                <SectionComponent
-                  adjustments={adjustments}
-                  setAdjustments={setAdjustments}
-                  histogram={histogram}
-                  theme={theme}
-                  handleLutSelect={handleLutSelect}
-                  appSettings={appSettings}
-                  isWbPickerActive={isWbPickerActive}
-                  toggleWbPicker={toggleWbPicker}
-                  onDragStateChange={onDragStateChange}
-                />
-              </CollapsibleSection>
-            </div>
-          );
-        })}
+            return (
+              <div className="shrink-0 group" key={sectionName}>
+                <CollapsibleSection
+                  isContentVisible={sectionVisibility[sectionName as keyof SectionVisibility]}
+                  isOpen={collapsibleSectionsState[sectionName as keyof typeof collapsibleSectionsState]}
+                  onContextMenu={(e: any) => handleSectionContextMenu(e, sectionName)}
+                  onToggle={() => handleToggleSection(sectionName)}
+                  onToggleVisibility={() => handleToggleVisibility(sectionName)}
+                  title={title}
+                >
+                  <SectionComponent
+                    adjustments={adjustments}
+                    setAdjustments={setAdjustments}
+                    histogram={histogram}
+                    theme={theme}
+                    handleLutSelect={handleLutSelect}
+                    onLutHover={setLutPreviewOverride}
+                    appSettings={appSettings}
+                    isWbPickerActive={isWbPickerActive}
+                    toggleWbPicker={toggleWbPicker}
+                    onDragStateChange={onDragStateChange}
+                  />
+                </CollapsibleSection>
+              </div>
+            );
+          })
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <Text
+              variant={TextVariants.heading}
+              color={TextColors.secondary}
+              weight={TextWeights.normal}
+              className="text-center"
+            >
+              {t('editor.ai.noImageSelected')}
+            </Text>
+          </div>
+        )}
       </div>
     </div>
   );

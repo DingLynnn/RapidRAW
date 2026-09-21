@@ -30,6 +30,7 @@ export const GLOBAL_KEYS = [
 export const OPTION_SEPARATOR = 'separator';
 
 export enum Invokes {
+  CalculateSmartToneSuggestions = 'calculate_smart_tone_suggestions',
   AddTagForPaths = 'add_tag_for_paths',
   ApplyAdjustments = 'apply_adjustments',
   ApplyAdjustmentsToPaths = 'apply_adjustments_to_paths',
@@ -54,11 +55,9 @@ export enum Invokes {
   GenerateAiForegroundMask = 'generate_ai_foreground_mask',
   GenerateAiSkyMask = 'generate_ai_sky_mask',
   GenerateAiSubjectMask = 'generate_ai_subject_mask',
-  GenerateFullscreenPreview = 'generate_fullscreen_preview',
   GeneratePreviewForPath = 'generate_preview_for_path',
   GenerateMaskOverlay = 'generate_mask_overlay',
   GeneratePresetPreview = 'generate_preset_preview',
-  GenerateThumbnailsProgressive = 'generate_thumbnails_progressive',
   GenerateUncroppedPreview = 'generate_uncropped_preview',
   DeleteAiModelAsset = 'delete_ai_model_asset',
   GetFolderTree = 'get_folder_tree',
@@ -70,10 +69,11 @@ export enum Invokes {
   GetSupportedFileTypes = 'get_supported_file_types',
   HandleExportPresetsToFile = 'handle_export_presets_to_file',
   HandleImportPresetsFromFile = 'handle_import_presets_from_file',
+  HandleImportPresetsFromFiles = 'handle_import_presets_from_files',
   HandleImportLegacyPresetsFromFile = 'handle_import_legacy_presets_from_file',
   ImportFiles = 'import_files',
-  InvokeGenerativeReplace = 'invoke_generative_replace',
   InvokeGenerativeReplaseWithMaskDef = 'invoke_generative_replace_with_mask_def',
+  IsTetheringSupported = 'is_tethering_supported',
   ListImagesInDir = 'list_images_in_dir',
   ListImagesRecursive = 'list_images_recursive',
   LoadImage = 'load_image',
@@ -99,6 +99,8 @@ export enum Invokes {
   ShowInFinder = 'show_in_finder',
   StartBackgroundIndexing = 'start_background_indexing',
   StitchPanorama = 'stitch_panorama',
+  StitchFocusStack = 'stitch_focus_stack',
+  SaveFocusStack = 'save_focus_stack',
   MergeHdr = 'merge_hdr',
   TestAIConnectorConnection = 'test_ai_connector_connection',
   UpdateWgpuTransform = 'update_wgpu_transform',
@@ -111,6 +113,12 @@ export enum Invokes {
   SaveAlbums = 'save_albums',
   AddToAlbum = 'add_to_album',
   GetAlbumImages = 'get_album_images',
+  TetherListCameras = 'tether_list_cameras',
+  TetherConnect = 'tether_connect',
+  TetherGetSettings = 'tether_get_settings',
+  TetherSetSetting = 'tether_set_setting',
+  TetherCapture = 'tether_capture',
+  TetherGetPreview = 'tether_get_preview',
 }
 
 export enum ExifOverlay {
@@ -127,18 +135,28 @@ export enum Panel {
   Masks = 'masks',
   Metadata = 'metadata',
   Presets = 'presets',
+  FolderTree = 'folderTree',
+  Tethering = 'tethering',
 }
+
+export type PanelRegion = 'leftTop' | 'leftBottom' | 'rightTop' | 'rightBottom';
 
 export enum RawStatus {
   All = 'all',
   NonRawOnly = 'nonRawOnly',
   RawOnly = 'rawOnly',
-  RawOverNonRaw = 'rawOverNonRaw',
 }
 
 export enum SortDirection {
   Ascending = 'asc',
   Descending = 'desc',
+}
+
+type FolderSortKey = 'name' | 'modified' | 'created' | 'imageCount';
+
+export interface FolderTreeSort {
+  key: FolderSortKey;
+  order: SortDirection;
 }
 
 export enum Theme {
@@ -155,23 +173,42 @@ export enum Theme {
 export enum ThumbnailAspectRatio {
   Cover = 'cover',
   Contain = 'contain',
+  Justified = 'justified',
 }
+
+export interface WorkspaceState {
+  leftPanelWidth: number;
+  rightPanelWidth: number;
+  leftTopHeight: number;
+  rightTopHeight: number;
+  panelLayout: Record<PanelRegion, Panel[]>;
+  activePanels: Record<PanelRegion, Panel | null>;
+  panelSwitcherPlacement: Record<PanelRegion, 'left' | 'right' | 'top' | 'bottom'>;
+}
+
+export type GroupPreference = 'jpeg' | 'raw';
+export type GroupingMode = 'off' | GroupPreference;
 
 export interface AppSettings {
   aiConnectorAddress?: string;
   aiProvider?: string;
   decorations?: any;
   editorPreviewResolution?: number;
+  smallThumbnailResolution?: number;
+  mediumThumbnailResolution?: number;
   enableZoomHifi?: boolean;
   useFullDpiRendering?: boolean;
   highResZoomMultiplier?: number;
   enableLivePreviews?: boolean;
   livePreviewQuality?: string;
   enableAiTagging?: boolean;
+  aiTagCount?: number;
+  customAiTags?: string[];
   filterCriteria?: FilterCriteria;
   lastFolderState?: any;
   pinnedFolders?: any;
   lastRootPath: string | null;
+  rootFolders?: string[];
   libraryViewMode?: LibraryViewMode;
   sortCriteria?: SortCriteria;
   theme: Theme;
@@ -193,8 +230,10 @@ export interface AppSettings {
   waveformHeight?: number;
   activeWaveformChannel?: string;
   useWgpuRenderer?: boolean;
+  editorNeutralGreyBg?: boolean;
   canvasInputMode?: 'mouse' | 'trackpad';
   zoomSpeedMultiplier?: number;
+  zoomPhotoToPixelClick?: boolean;
   keybinds?: { [action: string]: string[] };
   tonemapperOverrideEnabled?: boolean;
   defaultRawTonemapper?: string;
@@ -205,6 +244,16 @@ export interface AppSettings {
   folderIcons?: Record<string, string>;
   exifOverlay?: ExifOverlay;
   language?: string;
+  fontFamily?: string;
+  folderTreeSort?: FolderTreeSort;
+  taggingShortcuts?: string[];
+  libraryDisplayMode?: LibraryDisplayMode;
+  grouping?: GroupingMode;
+  requireMatchingExif?: boolean;
+  groupEditedFiles?: boolean;
+  groupPreferredType?: GroupPreference; // legacy
+  alwaysDecodeRawThumbnails?: boolean;
+  workspace?: WorkspaceState;
 }
 
 export interface BrushSettings {
@@ -248,6 +297,9 @@ export interface ImageFile {
   tags: Array<string> | null;
   exif: { [key: string]: string } | null;
   is_virtual_copy: boolean;
+  is_cloud_placeholder: boolean;
+  is_raw: boolean;
+  group_id: string | null;
 }
 
 export interface Option {
@@ -285,12 +337,12 @@ export interface Progress {
 
 export interface SelectedImage {
   exif: any;
+  group_id?: string | null;
   height: number;
   isRaw: boolean;
   isReady: boolean;
   metadata?: any;
   original_base64?: string;
-  originalUrl: string | null;
   path: string;
   thumbnailUrl: string;
   width: number;
@@ -307,11 +359,16 @@ export interface SupportedTypes {
   raw: Array<string>;
 }
 
+export enum LibraryDisplayMode {
+  Grid = 'grid',
+  Cull = 'cull',
+  List = 'list',
+}
+
 export enum ThumbnailSize {
   Large = 'large',
   Medium = 'medium',
   Small = 'small',
-  List = 'list',
 }
 
 export interface TransformState {
@@ -321,8 +378,10 @@ export interface TransformState {
 }
 
 export interface UiVisibility {
-  folderTree: boolean;
   filmstrip: boolean;
+  leftPanel: boolean;
+  rightPanel: boolean;
+  quickFilter?: boolean;
 }
 
 export interface WaveformData {
@@ -344,7 +403,7 @@ export interface CullingSettings {
   filterBlurry: boolean;
 }
 
-export interface ImageAnalysisResult {
+interface ImageAnalysisResult {
   path: string;
   qualityScore: number;
   sharpnessMetric: number;
@@ -356,7 +415,7 @@ export interface ImageAnalysisResult {
   height: number;
 }
 
-export interface CullGroup {
+interface CullGroup {
   representative: ImageAnalysisResult;
   duplicates: ImageAnalysisResult[];
 }
@@ -367,7 +426,7 @@ export interface CullingSuggestions {
   failedPaths: string[];
 }
 
-export interface KeybindHandler {
+interface KeybindHandler {
   shouldFire?: () => boolean;
   execute: (event: KeyboardEvent) => void;
 }

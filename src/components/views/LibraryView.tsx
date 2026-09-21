@@ -11,13 +11,16 @@ import { useProcessStore } from '../../store/useProcessStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 
 import { ImageFile, LibraryViewMode, ThumbnailAspectRatio, ThumbnailSize } from '../ui/AppProperties';
+import { GroupBadgeInfo, GroupId } from '../../utils/imageGrouping';
 
 interface LibraryViewProps {
   sortedImageList: ImageFile[];
+  groupBadgeInfo: Map<GroupId, GroupBadgeInfo> | null;
   thumbnailSize: ThumbnailSize;
   thumbnailAspectRatio: ThumbnailAspectRatio;
   libraryViewMode: LibraryViewMode;
   isAndroid: boolean;
+  layoutMode: 'compact' | 'wide' | 'full';
   setThumbnailSize: (size: ThumbnailSize) => void;
   setThumbnailAspectRatio: (ratio: ThumbnailAspectRatio) => void;
   setLibraryViewMode: (mode: LibraryViewMode) => void;
@@ -40,10 +43,12 @@ interface LibraryViewProps {
 
 export default function LibraryView({
   sortedImageList,
+  groupBadgeInfo,
   thumbnailSize,
   thumbnailAspectRatio,
   libraryViewMode,
   isAndroid,
+  layoutMode,
   setThumbnailSize,
   setThumbnailAspectRatio,
   setLibraryViewMode,
@@ -130,6 +135,7 @@ export default function LibraryView({
             aiModelDownloadStatus={aiModelDownloadStatus}
             appSettings={appSettings}
             currentFolderPath={currentFolderPath}
+            groupBadgeInfo={groupBadgeInfo}
             imageList={sortedImageList}
             imageRatings={imageRatings}
             importState={importState}
@@ -169,6 +175,7 @@ export default function LibraryView({
             isCopyDisabled={multiSelectedPaths.length !== 1}
             isExportDisabled={multiSelectedPaths.length === 0}
             isLibraryView={true}
+            layoutMode={layoutMode}
             isPasted={isPasted}
             isPasteDisabled={useEditorStore.getState().copiedAdjustments === null || multiSelectedPaths.length === 0}
             isRatingDisabled={multiSelectedPaths.length === 0}

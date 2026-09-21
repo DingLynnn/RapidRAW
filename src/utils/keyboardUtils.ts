@@ -38,6 +38,12 @@ export const KEYBIND_DEFINITIONS: KeybindDefinition[] = [
     section: 'library',
   },
   {
+    action: 'copy_image_path',
+    description: 'settings.keybinds.actions.copy_image_path',
+    defaultCombo: ['ctrl', 'KeyL'],
+    section: 'library',
+  },
+  {
     action: 'select_all',
     description: 'settings.keybinds.actions.select_all',
     defaultCombo: ['ctrl', 'KeyA'],
@@ -194,6 +200,12 @@ export const KEYBIND_DEFINITIONS: KeybindDefinition[] = [
     section: 'panels',
   },
   {
+    action: 'toggle_folder_tree',
+    description: 'settings.keybinds.actions.toggle_folder_tree',
+    defaultCombo: ['KeyL'],
+    section: 'panels',
+  },
+  {
     action: 'toggle_analytics',
     description: 'settings.keybinds.actions.toggle_analytics',
     defaultCombo: ['KeyA'],
@@ -206,9 +218,39 @@ export const KEYBIND_DEFINITIONS: KeybindDefinition[] = [
     section: 'panels',
   },
   {
+    action: 'toggle_left_panel',
+    description: 'settings.keybinds.actions.toggle_left_panel',
+    defaultCombo: ['ctrl', 'shift', 'KeyB'],
+    section: 'panels',
+  },
+  {
+    action: 'toggle_right_panel',
+    description: 'settings.keybinds.actions.toggle_right_panel',
+    defaultCombo: ['ctrl', 'KeyB'],
+    section: 'panels',
+  },
+  {
+    action: 'toggle_bottom_panel',
+    description: 'settings.keybinds.actions.toggle_bottom_panel',
+    defaultCombo: ['ctrl', 'KeyJ'],
+    section: 'panels',
+  },
+  {
     action: 'toggle_library_exif',
     description: 'settings.keybinds.actions.toggle_library_exif',
     defaultCombo: ['KeyT'],
+    section: 'library',
+  },
+  {
+    action: 'open_settings',
+    description: 'settings.keybinds.actions.open_settings',
+    defaultCombo: ['ctrl', 'Comma'],
+    section: 'library',
+  },
+  {
+    action: 'focus_search',
+    description: 'settings.keybinds.actions.focus_search',
+    defaultCombo: ['ctrl', 'KeyF'],
     section: 'library',
   },
   { action: 'undo', description: 'settings.keybinds.actions.undo', defaultCombo: ['ctrl', 'KeyZ'], section: 'editing' },
@@ -303,7 +345,9 @@ export function normalizeCombo(event: KeyboardEvent, osPlatform?: string): strin
   if (event.shiftKey) parts.push('shift');
   if (event.altKey) parts.push('alt');
   let code = isMacDelete ? 'Delete' : event.code;
-  if (/^Numpad[0-9]$/.test(code)) {
+  if (event.key && /^[a-zA-Z]$/.test(event.key)) {
+    code = `Key${event.key.toUpperCase()}`;
+  } else if (/^Numpad[0-9]$/.test(code)) {
     code = `Digit${code.slice(-1)}`;
   } else if (code === 'NumpadAdd') {
     code = 'Equal';
@@ -316,7 +360,7 @@ export function normalizeCombo(event: KeyboardEvent, osPlatform?: string): strin
   return parts;
 }
 
-export function codeToDisplayLabel(code: string): string | null {
+function codeToDisplayLabel(code: string): string | null {
   if (/^Key[A-Z]$/.test(code) || /^Digit[0-9]$/.test(code)) {
     return code[code.length - 1].toUpperCase();
   }
@@ -326,7 +370,7 @@ export function codeToDisplayLabel(code: string): string | null {
   return symMap[code] ?? null;
 }
 
-export function isValidShortcutKey(code: string): boolean {
+function isValidShortcutKey(code: string): boolean {
   if (code.startsWith('Key') || code.startsWith('Digit')) return true;
   if (code.startsWith('F') && /^\d+$/.test(code.slice(1))) return true;
   if (/^Numpad[0-9]$/.test(code)) return true;
@@ -340,8 +384,4 @@ export function formatKeyCode(key: string, osPlatform: string): string {
   if (key === 'Delete' && osPlatform === 'macos') return 'Delete / ⌘+⌫';
   const label = codeToDisplayLabel(key);
   return label || key;
-}
-
-export function arraysEqual(a: string[], b: string[]): boolean {
-  return a.length === b.length && a.every((v, i) => v === b[i]);
 }

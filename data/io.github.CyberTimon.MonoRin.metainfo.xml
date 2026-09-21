@@ -38,6 +38,146 @@
   <url type="homepage">https://github.com/CyberTimon/RapidRAW</url>
 
   <releases>
+    <release version="v1.6.4" date="2026-09-17">
+        <url type="details">https://github.com/CyberTimon/RapidRAW/releases/tag/v1.6.4</url>
+        <description translate="no">
+            <p>New Features</p>
+            <ul>
+                <li>Highlight Recovery: Rebuilt highlight recovery engine capable of reconstructing clipped color channels using remaining channel data, alongside a reworked shader pipeline featuring a true Exposure control and Brightness adjustment.</li>
+                <li>Crop, Pan &amp; Zoom Shortcuts: Added Ctrl + Mouse Wheel to quickly crop in/out and Ctrl + Drag to pan within the crop frame directly on the canvas.</li>
+                <li>Library Navigation: Added an active folder navigation header in the Sources panel to quickly navigate back and forth between directories.</li>
+                <li>Masonry Library Grid: Introduced a masonry thumbnail layout mode and set Original Ratio thumbnail mode as default.</li>
+                <li>Neutral Grey Canvas: Added a toggleable neutral middle-grey canvas background to eliminate optical contrast illusions and color bias while editing.</li>
+            </ul>
+            <p>Core Improvements</p>
+            <ul>
+                <li>Export Subfolders: Added support for exporting directly to the original folder within a custom subfolder.</li>
+                <li>Smoother Vibrance: Overhauled the vibrance algorithm to behave much more smoothly and predictably.</li>
+                <li>Quick Filter State: Expanded/collapsed state is now remembered across sessions.</li>
+                <li>EXIF &amp; Metadata Fixes: Resolved bugs where EXIF data went missing and ensured metadata displays properly inside the Albums view.</li>
+                <li>Stability &amp; Fixes: Fixed backend issues across export routines and EXIF handling for improved stability.</li>
+            </ul>
+        </description>
+    </release>
+    <release version="v1.6.3" date="2026-09-03">
+        <url type="details">https://github.com/CyberTimon/RapidRAW/releases/tag/v1.6.3</url>
+        <description translate="no">
+            <p>New Features</p>
+            <ul>
+                <li>Liquify Tool: Reshape and warp specific areas of an image for structural adjustments or creative distortion.</li>
+                <li>Retouch Tool: Dedicated brush to smooth skin and remove blemishes while intelligently preserving natural edge details.</li>
+                <li>Guided Perspective Correction: Draw up to four guide lines on the canvas to automatically align structures and architectural perspective.</li>
+                <li>Edge-Aware AI Subject Masks: Added an edge-aware post-processing filter so subject mask edges snap accurately to subjects.</li>
+                <li>Unified Crop &amp; Transform Panel: Integrated lens correction and transform controls directly into the crop panel with real-time canvas previews.</li>
+                <li>Rewritten EXIF &amp; Thumbnail Engines: Metadata is now cached centrally without cluttering folders with sidecars, and dual-resolution thumbnails drastically speed up browsing.</li>
+                <li>Categorized Mask Panel: Redesigned the mask creation workflow into categorized sections for quicker access.</li>
+                <li>Workflow Shortcuts: Added a batch auto-apply option for lens corrections and a Shift + Drag canvas shortcut to auto-straighten the horizon.</li>
+            </ul>
+            <p>Core Improvements</p>
+            <ul>
+                <li>Sharpening Refinements: Reduced artifacts and halos around high-contrast edges.</li>
+                <li>Instant Original Preview: Rewritten toggle logic switches instantly via the primary rendering pipeline.</li>
+                <li>Wayland Support: Resolved compatibility issues under Linux Wayland sessions without requiring manual workarounds.</li>
+                <li>Denoise Exposure Fix: Fixed a bug that caused denoised images to appear darker than the original RAW.</li>
+                <li>Stability &amp; Fixes: Added automatic GPU recovery on rendering errors, resolved EXIF metadata export bugs, and refreshed application icons.</li>
+            </ul>
+        </description>
+    </release>
+    <release version="v1.6.2" date="2026-08-21">
+        <url type="details">https://github.com/CyberTimon/RapidRAW/releases/tag/v1.6.2</url>
+        <description translate="no">
+            <p>New Features</p>
+            <ul>
+                <li>Camera Tethering: Connect cameras over USB for real-time live view, remote capture, camera controls, and automatic ingestion.</li>
+                <li>Focus Stacking: Merge multiple focus-bracketed exposures into a single image with extended front-to-back sharpness.</li>
+                <li>Analog Film Emulations: Built-in, scientifically modeled film profiles powered by spektrafilm in a scene-referred V-Log pipeline.</li>
+                <li>Deconvolution Sharpening: Rewritten sharpening engine featuring multi-scale deconvolution with halo suppression and edge smoothing.</li>
+                <li>Drag &amp; Drop Organization: Select and drag multiple images directly into folders or albums.</li>
+            </ul>
+            <p>Core Improvements</p>
+            <ul>
+                <li>Full EXIF Preservation: Retain and embed complete capture metadata upon export.</li>
+                <li>Touch &amp; Tablet UI: Restored side panel layouts and controls for touch-screen devices.</li>
+                <li>Inpainting Auto-Crop: Added automatic canvas cropping for generative AI inpainting workflows.</li>
+                <li>Stability &amp; Fixes: General bug fixes and overall performance optimizations.</li>
+            </ul>
+        </description>
+    </release>
+    <release version="v1.6.1" date="2026-08-07">
+        <url type="details">https://github.com/CyberTimon/RapidRAW/releases/tag/v1.6.1</url>
+        <description translate="no">
+            <p>New Features</p>
+            <ul>
+                <li>Fully Customizable Workspace: Drag-and-drop panel switcher to reorder panels and build custom split-view layouts.</li>
+                <li>Unified Library &amp; Edit Views: Access editing tools and adjustment panels directly within the library grid without switching views.</li>
+            </ul>
+            <p>Core Improvements</p>
+            <ul>
+                <li>Export Stability &amp; Memory Optimization: Reduced VRAM consumption during exports to prevent out-of-memory crashes on lower-end systems.</li>
+                <li>Display Color Accuracy: Resolved subtle color shift issues on P3 wide-gamut displays (especially Apple Displays).</li>
+                <li>Image-Based LUTs &amp; Batch Presets: Added support for image-based LUT formats (.png, .jpg, .tiff) and batch-importing multiple presets simultaneously.</li>
+                <li>WGPU &amp; Workflow Upgrades: Enabled White Balance picker on the WGPU renderer, added Cmd/Ctrl+L shortcut to copy file paths, and added Catalan language support.</li>
+            </ul>
+        </description>
+    </release>
+    <release version="v1.6.0" date="2026-07-26">
+        <url type="details">https://github.com/CyberTimon/RapidRAW/releases/tag/v1.6.0</url>
+        <description translate="no">
+            <p>New Features</p>
+            <ul>
+                <li>Lens Blur (Bokeh): Added an AI-powered depth blur tool to generate realistic depth-of-field, custom bokeh shapes, and tilt-shift miniature effects.</li>
+                <li>Culling View: Introduced a side-by-side comparison view supporting up to 6 images with quick star rating and metadata inspection.</li>
+                <li>Group RAW + JPEG: Stacks RAW and JPEG file pairs together in the library view with customizable primary display preferences.</li>
+                <li>Command Line Interface (CLI): Added a headless export CLI for automated batch processing and terminal scripting.</li>
+            </ul>
+            <p>Core Improvements</p>
+            <ul>
+                <li>Performance Optimizations: Drastically improved thumbnail loading speeds on HDDs and optimized performance across library and analytics panels.</li>
+                <li>Cropping Upgrades: Enhanced the crop tool with area preservation and crop-centered rotation.</li>
+                <li>Export &amp; Memory Enhancements: Significantly reduced RAM usage during exports and calibrated JPEG XL quality curves.</li>
+                <li>Workflow Improvements: Preserved image selections between views, added quick shortcuts for search and settings, and made multi-selection adjustment sync optional.</li>
+                <li>Metadata &amp; Bug Fixes: Improved lens metadata extraction, resolved Canon multi-exposure white balance errors, and fixed performance issues on Linux NVIDIA GPUs.</li>
+            </ul>
+        </description>
+    </release>
+    <release version="v1.5.9" date="2026-07-12">
+        <url type="details">https://github.com/CyberTimon/RapidRAW/releases/tag/v1.5.9</url>
+        <description translate="no">
+            <p>New Features</p>
+            <ul>
+                <li>Manual Clone &amp; Heal Tools: Implemented dedicated algorithmic manual control tools. You can now set a source point and seamlessly heal blemishes or copy exact pixels over to your target area at full image resolution.</li>
+                <li>Refined AI Inpainting: Optimized the AI engine to resolve color space issues and eliminate blocky quantization artifacts, ensuring generated patches blend coherently with surrounding pixels.</li>
+                <li>Improved Shadows &amp; Blacks Shader: Rewrote the underlying shader algorithm for lifting shadows and blacks, removing previous "plastic" looks and resulting in a much more natural, pleasing roll-off.</li>
+                <li>HDR Merge Improvements: Introduced robust deghosting and auto-alignment capabilities for merging handheld HDR brackets. Also resolved color space issues that previously caused merged files to appear underexposed.</li>
+            </ul>
+            <p>Core Improvements</p>
+            <ul>
+                <li>Performance Enhancements: Improved thumbnail loading speeds by utilizing native file transfers and updating the core rendering engines.</li>
+                <li>External Editor Support: Added an "Open With" feature to easily hand off images to other applications.</li>
+                <li>RAW Fallback Handling: Added a smart fallback mechanism that loads embedded JPEG previews for undecodable or currently unsupported RAW files.</li>
+                <li>General Bug Fixes: Fixed copying adjustments from the filmstrip, resolved Android AI/LUT download issues, enabled inpainting on rotated images, and squashed several Windows-specific bugs including offscreen windows and export errors.</li>
+                <li>Under the Hood: Bumped various system dependencies to keep everything secure and up-to-date.</li>
+            </ul>
+        </description>
+    </release>
+    <release version="v1.5.8" date="2026-06-25">
+        <url type="details">https://github.com/CyberTimon/RapidRAW/releases/tag/v1.5.8</url>
+        <description translate="no">
+            <p>New Features</p>
+            <ul>
+                <li>Preset Intensity Slider: Added a slider to adjust the overall strength of a selected preset for more precise control.</li>
+                <li>Global Hue Slider: Introduced a global hue adjustment tool in the editing panel for quick color shifts and creative corrections.</li>
+                <li>Quick Bottombar Filters: Added direct filter options to the bottombar, allowing you to filter the current image list without navigating back to the main library settings.</li>
+                <li>Folder Sorting: Added support for customizing how the folder tree sorts directories to improve organization.</li>
+                <li>New Languages: Expanded translation support to include Korean and Traditional Chinese.</li>
+            </ul>
+            <p>Core Improvements</p>
+            <ul>
+                <li>Folder &amp; Album Counts: Improved the reliability of folder and album image counts to ensure they stay updated and accurate.</li>
+                <li>Background Indexing: Resolved an issue where background indexing operations could occasionally get stuck in an infinite loop.</li>
+            </ul>
+        </description>
+    </release>
     <release version="v1.5.7" date="2026-06-07">
         <url type="details">https://github.com/CyberTimon/RapidRAW/releases/tag/v1.5.7</url>
         <description translate="no">

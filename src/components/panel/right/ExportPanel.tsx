@@ -20,15 +20,16 @@ import {
   ExportState,
   FileFormats,
   WatermarkType,
+  TiffBitDepth,
 } from '../../ui/ExportImportProperties';
-import { Invokes, SelectedImage, AppSettings } from '../../ui/AppProperties';
+import { Invokes, SelectedImage, AppSettings, Panel } from '../../ui/AppProperties';
 import ExportPresetsList from '../../ui/ExportPresetsList';
 import { useExportSettings } from '../../../hooks/useExportSettings';
 import { useOsPlatform } from '../../../hooks/useOsPlatform';
 import Text from '../../ui/Text';
 import { TextColors, TextVariants, TextWeights } from '../../../types/typography';
-import { useShallow } from 'zustand/react/shallow';
 import { useEditorStore } from '../../../store/useEditorStore';
+import { useUIStore } from '../../../store/useUIStore';
 
 interface ExportPanelProps {
   exportState: ExportState;
@@ -96,11 +97,21 @@ export default function ExportPanel({
     [t],
   );
 
+  const tiffBitDepthOptions = useMemo(
+    () => [
+      { label: t('export.file.tiffBitDepth8'), value: '8' },
+      { label: t('export.file.tiffBitDepth16'), value: '16' },
+    ],
+    [t],
+  );
+
   const {
     fileFormat,
     setFileFormat,
     jpegQuality,
     setJpegQuality,
+    tiffBitDepth,
+    setTiffBitDepth,
     enableResize,
     setEnableResize,
     resizeMode,
@@ -151,14 +162,14 @@ export default function ExportPanel({
     setPreserveFolders,
     handleApplyPreset,
     currentSettingsObject,
+    destinationType,
+    setDestinationType,
+    subfolder,
+    setSubfolder,
   } = useExportSettings();
 
-  const { adjustments, finalPreviewUrl } = useEditorStore(
-    useShallow((state) => ({
-      adjustments: state.adjustments,
-      finalPreviewUrl: state.finalPreviewUrl,
-    })),
-  );
+  const finalPreviewUrl = useEditorStore((state) => state.finalPreviewUrl);
+  const adjustmentsRef = useRef(useEditorStore.getState().adjustments);
 
   const [isAdvancedExpanded, setIsAdvancedExpanded] = useState(false);
   const initDone = useRef(false);
@@ -197,24 +208,30 @@ export default function ExportPanel({
   const filenameInputRef = useRef<HTMLInputElement>(null);
   const osPlatform = useOsPlatform();
   const isAndroid = osPlatform === 'android';
+  const activePanels = useUIStore((state) => state.activePanels);
+  const isPanelReallyActive = Object.values(activePanels).includes(Panel.Export);
 
   const { status, progress, errorMessage } = exportState;
-  const isExporting = status === Status.Exporting;
+  const isExporting = [Status.Exporting, Status.Cancelling].includes(status);
+  const isCancelling = status === Status.Cancelling;
   const isLibraryContext = !!onClose;
 
-  const pathsToExport = isLibraryContext
-    ? multiSelectedPaths
-    : multiSelectedPaths.length > 0
+  const pathsToExport = useMemo(() => {
+    return isLibraryContext
       ? multiSelectedPaths
-      : selectedImage
-        ? [selectedImage.path]
-        : [];
+      : multiSelectedPaths.length > 0
+        ? multiSelectedPaths
+        : selectedImage
+          ? [selectedImage.path]
+          : [];
+  }, [isLibraryContext, multiSelectedPaths, selectedImage?.path]);
+
   const numImages = pathsToExport.length;
   const watermarkPreviewImageUrl = finalPreviewUrl || selectedImage?.thumbnailUrl || null;
 
   useEffect(() => {
     const fetchDims = async () => {
-      if (!enableWatermark || numImages === 0 || !isVisible) return;
+      if (!enableWatermark || numImages === 0 || !isVisible || !isPanelReallyActive) return;
       if (!isLibraryContext && selectedImage && selectedImage.width && selectedImage.height) {
         setImageAspectRatio(selectedImage.width / selectedImage.height);
         return;
@@ -324,26 +341,48 @@ export default function ExportPanel({
   );
 
   useEffect(() => {
+    if (!isPanelReallyActive) return;
+
     const exportSettings: ExportSettings = {
       filenameTemplate,
       jpegQuality,
+      tiffBitDepth,
       keepMetadata,
       preserveTimestamps,
       preserveFolders,
+      destinationType,
+      subfolder,
       resize: enableResize ? { mode: resizeMode, value: resizeValue, dontEnlarge } : null,
       stripGps,
-      exportMasks: !isLibraryContext ? exportMasks : undefined,
+      exportMasks,
       watermark: buildWatermarkSettings(),
     };
     const format = FILE_FORMATS.find((f: FileFormat) => f.id === fileFormat)?.extensions[0] || 'jpeg';
-    debouncedEstimateSize(pathsToExport, adjustments, selectedImage?.path, exportSettings, format);
-    return () => debouncedEstimateSize.cancel();
+    const runEstimate = () =>
+      debouncedEstimateSize(pathsToExport, adjustmentsRef.current, selectedImage?.path, exportSettings, format);
+
+    runEstimate();
+
+    let prevAdjustments = useEditorStore.getState().adjustments;
+    const unsubscribe = useEditorStore.subscribe((state) => {
+      if (state.adjustments !== prevAdjustments) {
+        prevAdjustments = state.adjustments;
+        adjustmentsRef.current = state.adjustments;
+        runEstimate();
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      debouncedEstimateSize.cancel();
+    };
   }, [
+    isPanelReallyActive,
     pathsToExport,
-    adjustments,
     selectedImage?.path,
     fileFormat,
     jpegQuality,
+    tiffBitDepth,
     enableResize,
     resizeMode,
     resizeValue,
@@ -386,25 +425,18 @@ export default function ExportPanel({
   const handleExport = async () => {
     if (numImages === 0 || isExporting) return;
 
-    let finalFilenameTemplate = filenameTemplate;
-    if (
-      numImages > 1 &&
-      !filenameTemplate.includes('{sequence}') &&
-      !filenameTemplate.includes('{original_filename}')
-    ) {
-      finalFilenameTemplate = `${filenameTemplate}_{sequence}`;
-      setFilenameTemplate(finalFilenameTemplate);
-    }
-
     const exportSettings: ExportSettings = {
-      filenameTemplate: finalFilenameTemplate,
+      filenameTemplate,
       jpegQuality,
+      tiffBitDepth,
       keepMetadata,
       preserveTimestamps,
       preserveFolders,
+      destinationType,
+      subfolder,
       resize: enableResize ? { mode: resizeMode, value: resizeValue, dontEnlarge } : null,
       stripGps,
-      exportMasks: !isLibraryContext ? exportMasks : undefined,
+      exportMasks,
       watermark: buildWatermarkSettings(),
     };
 
@@ -414,10 +446,15 @@ export default function ExportPanel({
       const selectedFormat: any = FILE_FORMATS.find((f) => f.id === fileFormat);
 
       let outputFolderOrFile = '';
-      if (numImages === 1) {
+      const isOriginalFolder = destinationType === 'originalFolder';
+      const shouldChooseOutputFile = numImages === 1 && !preserveFolders && !isOriginalFolder;
+
+      if (isOriginalFolder) {
+        outputFolderOrFile = 'originalFolderDummy';
+      } else if (shouldChooseOutputFile) {
         const originalFilename = pathsToExport[0].split(/[\\/]/).pop() || '';
         const stem = originalFilename.substring(0, originalFilename.lastIndexOf('.')) || originalFilename;
-        const suggestedName = finalFilenameTemplate.replace('{original_filename}', stem);
+        const suggestedName = (filenameTemplate || '').replace('{original_filename}', stem);
         const outputFileName = `${suggestedName}.${selectedFormat.extensions[0]}`;
 
         outputFolderOrFile = isAndroid
@@ -445,26 +482,29 @@ export default function ExportPanel({
 
       if (isAndroid || outputFolderOrFile) {
         if (!isAndroid) {
-          const dir =
-            numImages === 1
+          if (isOriginalFolder) {
+            saveLastUsedPreset(lastExportPath || '');
+          } else {
+            const dir = shouldChooseOutputFile
               ? outputFolderOrFile.substring(
                   0,
                   Math.max(outputFolderOrFile.lastIndexOf('/'), outputFolderOrFile.lastIndexOf('\\')),
                 )
               : outputFolderOrFile;
-          if (dir) saveLastUsedPreset(dir);
+            if (dir) saveLastUsedPreset(dir);
+          }
         }
 
         setExportState({ status: Status.Exporting, progress: { current: 0, total: numImages }, errorMessage: '' });
         await invoke(Invokes.ExportImages, {
           paths: pathsToExport,
           outputFolderOrFile: outputFolderOrFile,
-          isExplicitFilePath: numImages === 1,
+          isExplicitFilePath: shouldChooseOutputFile,
           baseOriginFolders: rootPaths,
           exportSettings,
           outputFormat: selectedFormat.extensions[0],
           currentEditPath: selectedImage?.path || null,
-          currentEditAdjustments: adjustments || null,
+          currentEditAdjustments: adjustmentsRef.current || null,
         });
       }
     } catch (error) {
@@ -477,10 +517,16 @@ export default function ExportPanel({
   };
 
   const handleCancel = async () => {
+    setExportState((current: ExportState) =>
+      current.status === Status.Exporting ? { status: Status.Cancelling } : {},
+    );
     try {
       await invoke(Invokes.CancelExport);
     } catch (error) {
       console.error('Failed to cancel:', error);
+      setExportState((current: ExportState) =>
+        current.status === Status.Cancelling ? { status: Status.Exporting } : {},
+      );
     }
   };
 
@@ -491,26 +537,20 @@ export default function ExportPanel({
 
   return (
     <div className={onClose ? 'h-full bg-bg-secondary rounded-lg flex flex-col' : 'flex flex-col h-full'}>
-      <div className="p-4 flex justify-between items-center shrink-0 border-b border-surface">
+      <div className="p-3 flex justify-between items-center shrink-0 border-b border-surface">
         <Text variant={TextVariants.title}>{t('export.title')}</Text>
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="p-1 rounded-md text-text-secondary hover:bg-surface hover:text-text-primary"
-          >
-            <X size={20} />
-          </button>
-        )}
       </div>
-      <div className="grow overflow-y-auto p-4 space-y-8">
+      <div className="grow overflow-y-auto p-3 space-y-8">
         {canExport ? (
           <>
-            <ExportPresetsList
-              appSettings={appSettings}
-              onSettingsChange={onSettingsChange}
-              currentSettings={currentSettingsObject}
-              onApplyPreset={handleApplyPreset}
-            />
+            <div className={isExporting ? 'opacity-50 pointer-events-none' : ''}>
+              <ExportPresetsList
+                appSettings={appSettings}
+                onSettingsChange={onSettingsChange}
+                currentSettings={currentSettingsObject}
+                onApplyPreset={handleApplyPreset}
+              />
+            </div>
 
             <Section title={t('export.sections.fileSettings')}>
               <div className="grid grid-cols-3 gap-2">
@@ -538,16 +578,61 @@ export default function ExportPanel({
                     }
                     max={100}
                     min={1}
-                    onChange={(e) => setJpegQuality(parseInt(e.target.value))}
+                    onChange={(e) => setJpegQuality(Number(e.target.value))}
                     step={1}
                     value={jpegQuality}
                     fillOrigin="min"
                   />
                 </div>
               )}
+              {fileFormat === FileFormats.Tiff && (
+                <div className={isExporting ? 'opacity-50 pointer-events-none' : ''}>
+                  <Text variant={TextVariants.label} className="mb-1">
+                    {t('export.file.tiffBitDepth')}
+                  </Text>
+                  <Dropdown
+                    options={tiffBitDepthOptions}
+                    value={String(tiffBitDepth)}
+                    onChange={(value) => setTiffBitDepth(Number(value) as TiffBitDepth)}
+                    disabled={isExporting}
+                    className="w-full"
+                  />
+                </div>
+              )}
             </Section>
 
-            {(numImages > 1 || onClose) && (
+            <Section title={t('export.sections.destination')}>
+              <div className="space-y-3">
+                <Dropdown
+                  options={[
+                    { label: t('export.destination.customFolder'), value: 'customFolder' },
+                    { label: t('export.destination.originalFolder'), value: 'originalFolder' },
+                  ]}
+                  value={destinationType || 'customFolder'}
+                  onChange={(val) => setDestinationType(val as string)}
+                  disabled={isExporting}
+                  className="w-full"
+                />
+
+                {destinationType === 'originalFolder' && (
+                  <div className="flex items-center gap-3 pl-2 border-l-2 border-surface">
+                    <Text variant={TextVariants.label} className="whitespace-nowrap min-w-[70px]">
+                      {t('export.destination.subfolder')}
+                    </Text>
+                    <input
+                      className="w-full bg-surface border border-transparent rounded-md px-3 py-2 text-sm text-text-primary focus:outline-hidden truncate"
+                      disabled={isExporting}
+                      onChange={(e) => setSubfolder(e.target.value)}
+                      type="text"
+                      value={subfolder || ''}
+                      placeholder={t('export.destination.subfolderPlaceholder')}
+                    />
+                  </div>
+                )}
+              </div>
+            </Section>
+
+            {numImages > 1 && (
               <Section title={t('export.sections.fileNaming')}>
                 <input
                   className="w-full bg-surface border border-surface rounded-md p-2 text-sm text-text-primary focus:ring-accent focus:border-accent"
@@ -689,6 +774,7 @@ export default function ExportPanel({
               <div className="bg-surface rounded-xl overflow-hidden">
                 <button
                   onClick={() => setIsAdvancedExpanded(!isAdvancedExpanded)}
+                  disabled={isExporting}
                   className="w-full flex items-center justify-between p-3.5 hover:bg-card-active transition-colors"
                 >
                   <Text
@@ -718,7 +804,6 @@ export default function ExportPanel({
                           checked={preserveFolders}
                           onChange={setPreserveFolders}
                           disabled={isExporting}
-                          trackClassName="bg-surface"
                         />
                         {fileFormat !== FileFormats.Cube && (
                           <>
@@ -727,17 +812,13 @@ export default function ExportPanel({
                               disabled={isExporting}
                               label={t('export.advanced.preserveTimestamps')}
                               onChange={setPreserveTimestamps}
-                              trackClassName="bg-surface"
                             />
-                            {!isLibraryContext && (
-                              <Switch
-                                label={t('export.advanced.exportMasks')}
-                                checked={exportMasks}
-                                onChange={setExportMasks}
-                                disabled={isExporting}
-                                trackClassName="bg-surface"
-                              />
-                            )}
+                            <Switch
+                              label={t('export.advanced.exportMasks')}
+                              checked={exportMasks}
+                              onChange={setExportMasks}
+                              disabled={isExporting}
+                            />
                           </>
                         )}
                       </div>
@@ -748,18 +829,20 @@ export default function ExportPanel({
             </div>
           </>
         ) : (
-          <Text
-            variant={TextVariants.heading}
-            color={TextColors.secondary}
-            weight={TextWeights.normal}
-            className="text-center mt-4"
-          >
-            {isLibraryContext ? t('export.status.noImagesSelected') : t('export.status.noImageSelected')}
-          </Text>
+          <div className="flex items-center justify-center h-full">
+            <Text
+              variant={TextVariants.heading}
+              color={TextColors.secondary}
+              weight={TextWeights.normal}
+              className="text-center"
+            >
+              {isLibraryContext ? t('export.status.noImagesSelected') : t('export.status.noImageSelected')}
+            </Text>
+          </div>
         )}
       </div>
 
-      <div className="p-4 border-t border-surface shrink-0 space-y-2">
+      <div className="p-3 border-t border-surface shrink-0 space-y-2">
         <Text as="div" variant={TextVariants.small} color={TextColors.primary} className="text-center">
           {isEstimating ? (
             <span className="italic">{t('export.status.estimatingSize')}</span>
@@ -773,56 +856,68 @@ export default function ExportPanel({
             </span>
           ) : null}
         </Text>
-        <Button
-          className={`group rounded-md h-11 w-full flex items-center text-md font-bold! justify-center ${
-            status === Status.Exporting
-              ? 'bg-red-600/80 hover:bg-red-600 text-white'
-              : status === Status.Success
-                ? 'bg-green-500/70 text-white shadow-none'
-                : status === Status.Error
-                  ? 'bg-red-500/20 text-red-400 shadow-none'
-                  : status === Status.Cancelled
-                    ? 'bg-yellow-500/20 text-yellow-400 shadow-none'
-                    : ''
-          }`}
-          disabled={status === Status.Exporting ? false : !canExport}
-          onClick={status === Status.Exporting ? handleCancel : handleExport}
-          size="lg"
+        <motion.div
+          whileTap={!(isCancelling || (status !== Status.Exporting && !canExport)) ? { scale: 0.98 } : undefined}
+          transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+          className="w-full"
         >
-          {status === Status.Exporting ? (
-            <>
-              <span className="flex items-center group-hover:hidden">
-                <Loader size={18} className="animate-spin mr-2" />
-                {progress.total > 1
-                  ? t('export.status.exportingProgress', { current: progress.current, total: progress.total })
-                  : t('export.status.exporting')}
-              </span>
-              <span className="hidden items-center group-hover:flex">
-                <Ban size={18} className="mr-2" />
-                {t('export.status.cancelExport')}
-              </span>
-            </>
-          ) : status === Status.Success ? (
-            <>
-              <CheckCircle size={18} className="mr-2" /> {t('export.status.success')}
-            </>
-          ) : status === Status.Error ? (
-            <>
-              <XCircle size={18} className="mr-2" /> {errorMessage || t('export.status.failed')}
-            </>
-          ) : status === Status.Cancelled ? (
-            <>
-              <Ban size={18} className="mr-2" /> {t('export.status.cancelled')}
-            </>
-          ) : (
-            <>
-              <FileInput size={18} className="mr-2" />{' '}
-              {numImages > 1
-                ? t('export.status.exportMultiple', { count: numImages, label: itemLabelPlural })
-                : t('export.status.exportSingle', { label: itemLabel })}
-            </>
-          )}
-        </Button>
+          <Button
+            className={`group rounded-md h-11 w-full flex items-center text-md font-bold! justify-center ${
+              status === Status.Exporting
+                ? 'bg-red-600/80 hover:bg-red-600 text-white'
+                : status === Status.Cancelling
+                  ? 'bg-yellow-500/20 text-yellow-400 shadow-none'
+                  : status === Status.Success
+                    ? 'bg-green-500/70 text-white shadow-none'
+                    : status === Status.Error
+                      ? 'bg-red-500/20 text-red-400 shadow-none'
+                      : status === Status.Cancelled
+                        ? 'bg-yellow-500/20 text-yellow-400 shadow-none'
+                        : ''
+            }`}
+            disabled={isCancelling || (status !== Status.Exporting && !canExport)}
+            onClick={status === Status.Exporting ? handleCancel : handleExport}
+            size="lg"
+          >
+            {status === Status.Exporting ? (
+              <>
+                <span className="flex items-center group-hover:hidden">
+                  <Loader size={18} className="animate-spin mr-2" />
+                  {progress.total > 1
+                    ? t('export.status.exportingProgress', { current: progress.current, total: progress.total })
+                    : t('export.status.exporting')}
+                </span>
+                <span className="hidden items-center group-hover:flex">
+                  <Ban size={18} className="mr-2" />
+                  {t('export.status.cancelExport')}
+                </span>
+              </>
+            ) : status === Status.Cancelling ? (
+              <>
+                <Loader size={18} className="animate-spin mr-2" /> {t('export.status.cancelling')}
+              </>
+            ) : status === Status.Success ? (
+              <>
+                <CheckCircle size={18} className="mr-2" /> {t('export.status.success')}
+              </>
+            ) : status === Status.Error ? (
+              <>
+                <XCircle size={18} className="mr-2" /> {errorMessage || t('export.status.failed')}
+              </>
+            ) : status === Status.Cancelled ? (
+              <>
+                <Ban size={18} className="mr-2" /> {t('export.status.cancelled')}
+              </>
+            ) : (
+              <>
+                <FileInput size={18} className="mr-2" />{' '}
+                {numImages > 1
+                  ? t('export.status.exportMultiple', { count: numImages, label: itemLabelPlural })
+                  : t('export.status.exportSingle', { label: itemLabel })}
+              </>
+            )}
+          </Button>
+        </motion.div>
       </div>
     </div>
   );
